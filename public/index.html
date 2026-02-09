@@ -3,27 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Email Brander</title>
-
-  <!-- Tailwind CDN (OK for this static tool) -->
+  <title>Email Brander | Production Ready</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
   <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; transition: background-color 0.35s ease; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; transition: background-color 0.4s ease; }
     .config-mode { background-color: #0f172a; }
     .config-mode #main-card { background-color: #1e293b; border-color: #334155; color: white; }
     .config-mode label { color: #94a3b8; }
     .config-mode input, .config-mode textarea { background-color: #0f172a; border-color: #334155; color: #f1f5f9; }
-    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-    /* tiny toast */
-    .toast { opacity: 0; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
-    .toast.show { opacity: 1; transform: translateY(0); }
+    .custom-scrollbar::-webkit-scrollbar-shadow { background: #e2e8f0; border-radius: 10px; }
   </style>
 </head>
 
@@ -42,16 +33,16 @@
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex gap-2">
         <button id="btn-toggle-config"
           class="p-3 rounded-2xl bg-white shadow-sm border border-slate-200 hover:shadow-md transition-all group"
           title="Edit templates">
           <svg id="gear-icon" xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6 text-slate-600 group-hover:rotate-90 transition-transform duration-500"
-            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path id="gear-path-1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            class="h-6 w-6 text-slate-600 group-hover:rotate-90 transition-transform duration-500" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path id="gear-path-2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>
@@ -64,19 +55,37 @@
       <!-- Sidebar: Brand Inputs -->
       <div id="main-card"
         class="lg:col-span-5 bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 h-fit sticky top-6 transition-colors">
-        <h2 class="text-xs font-black text-blue-600 uppercase tracking-widest mb-8 flex items-center gap-2">
-          <span class="w-2 h-2 bg-blue-600 rounded-full"></span>
-          Brand Settings
-        </h2>
+
+        <!-- Header + Program Selector -->
+        <div class="mb-6 flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-4">
+            <h2 class="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <span class="w-2 h-2 bg-blue-600 rounded-full"></span>
+              Brand Settings
+            </h2>
+
+            <!-- Selector de programa -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Program</span>
+              <select id="program_selector"
+                      class="border border-slate-200 rounded-xl text-xs px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+              </select>
+            </div>
+          </div>
+
+          <p class="text-[11px] text-slate-400">
+            Select a program to generate templates for. Templates are stored per program.
+          </p>
+        </div>
 
         <div class="space-y-5">
           <div class="grid grid-cols-2 gap-4">
-            <div class="col-span-1">
+            <div class="col-span-1 field-wrapper">
               <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Brand Name</label>
               <input type="text" id="brand_name" placeholder="Vivoro"
                 class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all">
             </div>
-            <div class="col-span-1">
+            <div class="col-span-1 field-wrapper">
               <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Primary Color</label>
               <div class="flex gap-2">
                 <input type="color" id="color_picker" class="h-[50px] w-14 rounded-xl border-none cursor-pointer bg-slate-100 p-1">
@@ -86,19 +95,25 @@
             </div>
           </div>
 
-          <div>
+          <div class="field-wrapper">
             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Logo URL</label>
             <input type="text" id="logo_url" placeholder="https://..."
               class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs outline-none">
+            <div class="mt-3 flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                <img id="logo_preview" src="" alt="Logo preview" class="max-w-full max-h-full" style="display:none;" />
+              </div>
+              <span class="text-[11px] text-slate-400">Logo preview</span>
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
-            <div class="col-span-1">
+            <div class="col-span-1 field-wrapper">
               <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Support Email</label>
               <input type="email" id="support_email" placeholder="support@..."
                 class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-sm outline-none">
             </div>
-            <div class="col-span-1">
+            <div class="col-span-1 field-wrapper">
               <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Support Phone</label>
               <input type="text" id="support_phone_raw" placeholder="1445..."
                 class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-sm outline-none">
@@ -107,37 +122,47 @@
 
           <div class="pt-6 border-t border-slate-100 space-y-4">
             <label class="block text-[10px] font-bold text-indigo-500 uppercase tracking-widest ml-1">Links & Endpoints</label>
-            <input type="text" id="portal_url" placeholder="Portal URL"
-              class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
-            <input type="text" id="carecoaching_initial" placeholder="Care Coaching - Initial booking URL"
-              class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
-            <input type="text" id="carecoaching_refill" placeholder="Care Coaching - Refill booking URL"
-              class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
+
+            <!-- Extra fields condicionados por programa -->
+            <div class="field-wrapper program-extra" data-field="portal_url">
+              <input type="text" id="portal_url" placeholder="Portal URL"
+                class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
+            </div>
+
+            <div class="field-wrapper program-extra" data-field="carecoaching_initial">
+              <input type="text" id="carecoaching_initial" placeholder="Care Coaching - Initial booking URL"
+                class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
+            </div>
+
+            <div class="field-wrapper program-extra" data-field="carecoaching_refill">
+              <input type="text" id="carecoaching_refill" placeholder="Care Coaching - Refill booking URL"
+                class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
+            </div>
           </div>
         </div>
 
-        <button id="btn-generate" disabled
-          class="w-full mt-10 py-5 rounded-3xl font-bold bg-slate-200 text-slate-400 cursor-not-allowed uppercase text-xs tracking-[0.2em] transition-all transform active:scale-[0.98]">
-          Enable Generator
+        <button id="btn-generate"
+          class="w-full mt-10 py-5 rounded-3xl font-bold bg-slate-200 text-slate-400 cursor-pointer uppercase text-xs tracking-[0.2em] transition-all transform active:scale-[0.98]">
+          Enable / Validate
         </button>
 
-        <p class="mt-4 text-[11px] text-slate-400 leading-relaxed">
-          Tip: if you still see old text after pasting updates, it’s usually cached files or old localStorage values.
-          Click <span class="font-bold">Clear All</span> in editor mode and hard refresh.
+        <p class="mt-4 text-[10px] text-slate-400 leading-relaxed">
+          Tip: If you still see old text after pasting updates, it's usually cached files or old localStorage values.
+          Click <strong>Clear All</strong> in editor mode and hard refresh.
         </p>
       </div>
 
-      <!-- Main Panel -->
+      <!-- Main Panel: Templates Buttons -->
       <div class="lg:col-span-7">
         <div id="placeholder-empty"
           class="py-32 bg-slate-100/50 rounded-[3rem] border-2 border-dashed border-slate-200 text-slate-400 text-center px-10">
           <p class="text-lg font-medium italic">
             Fill out the fields on the left <br> to process all templates.
           </p>
-          <p id="templates-source" class="mt-4 text-xs text-slate-400"></p>
         </div>
-
-        <div id="grid-results" class="hidden grid grid-cols-1 gap-4 animate-in slide-in-from-right-10 duration-700"></div>
+        <div id="grid-results" class="hidden grid grid-cols-1 gap-4 animate-in slide-in-from-right-10 duration-700">
+          <!-- Dynamic -->
+        </div>
       </div>
     </div>
 
@@ -147,11 +172,10 @@
         <div class="space-y-1">
           <h2 class="text-3xl font-black text-white italic tracking-tight">Master Template Editor</h2>
           <p class="text-xs text-slate-400">
-            Loads from <span class="font-bold">/api/templates</span> (Vercel Function) and saves to Supabase.
+            Loads from /api/templates (Vercel Function) and saves to Supabase. Uses current program.
           </p>
         </div>
-
-        <div class="flex gap-4 items-center">
+        <div class="flex gap-4">
           <button id="btn-reset"
             class="px-6 py-3 rounded-2xl text-slate-400 font-bold hover:text-red-400 transition-colors uppercase text-[10px] tracking-widest">
             Clear All
@@ -163,34 +187,17 @@
         </div>
       </div>
 
-      <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-slate-800/50 p-5 rounded-[1.75rem] border border-slate-700/50">
-          <p class="text-xs text-slate-300 font-bold uppercase tracking-widest">Admin token</p>
-          <p class="mt-1 text-[11px] text-slate-400 leading-relaxed">
-            If your POST is returning <span class="font-bold">401</span>, set this once in DevTools:
-            <span class="font-mono text-slate-200">localStorage.setItem('eb_admin_token','YOUR_TOKEN')</span>
-          </p>
-        </div>
-        <div class="bg-slate-800/50 p-5 rounded-[1.75rem] border border-slate-700/50">
-          <p class="text-xs text-slate-300 font-bold uppercase tracking-widest">Status</p>
-          <p id="status-line" class="mt-1 text-[11px] text-slate-400">Ready.</p>
-        </div>
+      <div class="grid grid-cols-1 gap-8 custom-scrollbar" id="config-editor-list">
+        <!-- Dynamic -->
       </div>
-
-      <div class="grid grid-cols-1 gap-8 custom-scrollbar" id="config-editor-list"></div>
     </div>
-  </div>
 
-  <!-- Toast -->
-  <div id="toast"
-       class="toast fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-xl border border-slate-700">
-    <span id="toast-text">Done</span>
   </div>
 
   <script>
-    /**
-     * DATA
-     */
+    // ------------- HELPERS -------------
+    const $ = (id) => document.getElementById(id);
+
     const TEMPLATE_NAMES_LIST = [
       "1 Days Before - Email", "1 Hour Before - Email", "2 Days Before - Email", "5 Minutes Before - Email",
       "Appointment Confirmation - Async - Email", "Appointment Confirmation - Sync - Email", "AVS SOAP - Email",
@@ -202,12 +209,13 @@
       "Order Confirmation - Email", "Tracking Info - Email", "Welcome Message - Email"
     ];
 
-    const STORAGE_KEYS = {
-      BRAND: 'eb_brand_db',
-      // Optional local cache (for offline fallback). You can remove if you want zero local caching.
-      TEMPLATES_CACHE: 'eb_templates_cache',
-      ADMIN_TOKEN: 'eb_admin_token'
-    };
+    function defaultTemplates() {
+      return TEMPLATE_NAMES_LIST.map((name, i) => ({
+        id: i + 1,
+        name,
+        html: `<!-- Paste your HTML for ${name} here -->\n<div style="color: {{brand_color}}">Welcome to {{brand_name}}</div>`
+      }));
+    }
 
     let state = {
       brand: {
@@ -221,128 +229,123 @@
         carecoaching_refill: ""
       },
       templates: [],
-      templatesSource: "loading"
+      templatesSource: "loading",
+      isGenerating: false,
+      invalidFields: [],
+      programs: [
+        { slug: "default", name: "Default Program", extraFields: ["portal_url"] },
+        { slug: "care_coaching", name: "Care Coaching", extraFields: ["portal_url", "carecoaching_initial", "carecoaching_refill"] },
+        { slug: "other_program", name: "Other Program", extraFields: ["portal_url"] }
+      ],
+      selectedProgramSlug: "default"
     };
 
-    /**
-     * UI Helpers
-     */
-    const $ = (id) => document.getElementById(id);
+    // ------------- API HELPERS -------------
 
-    function setStatus(text) {
-      const el = $('status-line');
-      if (el) el.textContent = text;
-    }
-
-    function toast(msg) {
-      const t = $('toast');
-      const tt = $('toast-text');
-      tt.textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 1300);
-    }
-
-    function setTemplatesSourceLabel() {
-      const label = $('templates-source');
-      if (!label) return;
-      if (state.templatesSource === "api") {
-        label.textContent = "Templates loaded from database (/api/templates).";
-      } else if (state.templatesSource === "cache") {
-        label.textContent = "Templates loaded from local cache (could not reach DB).";
-      } else if (state.templatesSource === "defaults") {
-        label.textContent = "Using default templates (DB empty). Save once to persist to Supabase.";
-      } else {
-        label.textContent = "Loading templates…";
-      }
-    }
-
-    /**
-     * API Calls (Vercel Functions)
-     */
-    async function apiGetTemplates() {
-      const res = await fetch('/api/templates', { method: 'GET' });
+    async function apiGetTemplates(programSlug = "default") {
+      const res = await fetch(`/api/templates?program_slug=${encodeURIComponent(programSlug)}`, { method: 'GET' });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'GET /api/templates failed');
       return Array.isArray(json.templates) ? json.templates : [];
     }
 
-    async function apiSaveTemplates(templates) {
-      const adminToken = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || "";
+    async function apiSaveTemplates(templates, programSlug = "default") {
+      const adminToken = localStorage.getItem('eb_admin_token') || "";
       const res = await fetch('/api/templates', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-admin-token': adminToken
         },
-        body: JSON.stringify({ templates })
+        body: JSON.stringify({ templates, program_slug: programSlug })
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'POST /api/templates failed');
       return true;
     }
 
-    /**
-     * Initialization
-     */
-    function defaultTemplates() {
-      return TEMPLATE_NAMES_LIST.map((name, i) => ({
-        id: i + 1,
-        name,
-        html: `<!-- Paste your HTML for ${name} here -->\n<div style="color: {{brand_color}}">Welcome to {{brand_name}}</div>`
-      }));
-    }
-
-    async function init() {
-      // Load brand from localStorage
-      const savedBrand = localStorage.getItem(STORAGE_KEYS.BRAND);
-      if (savedBrand) {
-        try {
-          state.brand = JSON.parse(savedBrand);
-        } catch {}
-      }
-
-      // Push brand values into inputs
-      Object.keys(state.brand).forEach(key => {
-        const el = document.getElementById(key);
-        if (el) el.value = state.brand[key];
-      });
-      $('color_picker').value = state.brand.brand_color || "#F2C849";
-
-      // Load templates: API -> fallback cache -> defaults
+    async function reloadTemplatesForCurrentProgram() {
       try {
-        const templatesFromApi = await apiGetTemplates();
+        const templatesFromApi = await apiGetTemplates(state.selectedProgramSlug);
         if (templatesFromApi.length) {
           state.templates = templatesFromApi;
           state.templatesSource = "api";
-          // update local cache as backup
-          localStorage.setItem(STORAGE_KEYS.TEMPLATES_CACHE, JSON.stringify(state.templates));
         } else {
           state.templates = defaultTemplates();
           state.templatesSource = "defaults";
         }
       } catch (e) {
-        const cached = localStorage.getItem(STORAGE_KEYS.TEMPLATES_CACHE);
-        if (cached) {
-          try {
-            state.templates = JSON.parse(cached);
-            state.templatesSource = "cache";
-          } catch {
-            state.templates = defaultTemplates();
-            state.templatesSource = "defaults";
-          }
-        } else {
-          state.templates = defaultTemplates();
-          state.templatesSource = "defaults";
+        state.templates = defaultTemplates();
+        state.templatesSource = "defaults-local-fallback";
+      }
+    }
+
+    // ------------- INIT -------------
+
+    async function init() {
+      // cargar program selector
+      const programSelector = $('program_selector');
+      programSelector.innerHTML = '';
+      state.programs.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.slug;
+        opt.textContent = p.name;
+        if (p.slug === state.selectedProgramSlug) opt.selected = true;
+        programSelector.appendChild(opt);
+      });
+      programSelector.addEventListener('change', async (e) => {
+        state.selectedProgramSlug = e.target.value;
+        await reloadTemplatesForCurrentProgram();
+        updateProgramFieldsVisibility();
+        renderConfigEditor();
+        renderResultsButtons();
+      });
+
+      updateProgramFieldsVisibility();
+
+      // Templates
+      await reloadTemplatesForCurrentProgram();
+
+      // Brand data desde localStorage
+      const savedBrand = localStorage.getItem('eb_brand_db');
+      if (savedBrand) {
+        state.brand = JSON.parse(savedBrand);
+        Object.keys(state.brand).forEach(key => {
+          const el = $(key);
+          if (el) el.value = state.brand[key];
+        });
+        if (state.brand.brand_color) {
+          $('color_picker').value = state.brand.brand_color;
         }
+        if (state.brand.logo_url) {
+          const img = $('logo_preview');
+          img.src = state.brand.logo_url;
+          img.style.display = 'block';
+        }
+      } else {
+        $('color_picker').value = state.brand.brand_color;
       }
 
-      setTemplatesSourceLabel();
+      renderResultsButtons();
       checkValidations();
     }
 
-    /**
-     * Navigation logic
-     */
+    function updateProgramFieldsVisibility() {
+      const current = state.programs.find(p => p.slug === state.selectedProgramSlug);
+      const visibleSet = new Set(current ? current.extraFields : []);
+
+      document.querySelectorAll('.program-extra').forEach(wrapper => {
+        const field = wrapper.getAttribute('data-field');
+        if (visibleSet.has(field)) {
+          wrapper.classList.remove('hidden');
+        } else {
+          wrapper.classList.add('hidden');
+        }
+      });
+    }
+
+    // ------------- NAVIGATION LOGIC -------------
+
     const btnToggleConfig = $('btn-toggle-config');
     btnToggleConfig.addEventListener('click', () => {
       const isEditing = document.body.classList.toggle('config-mode');
@@ -351,130 +354,126 @@
 
       if (isEditing) {
         renderConfigEditor();
-        // X icon
-        $('gear-path-1').setAttribute('d', 'M6 18L18 6M6 6l12 12');
-        $('gear-path-2').setAttribute('d', '');
+        $('gear-icon').innerHTML =
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />';
       } else {
         renderResultsButtons();
-        // Gear icon
-        $('gear-path-1').setAttribute('d',
-          'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
-        );
-        $('gear-path-2').setAttribute('d', 'M15 12a3 3 0 11-6 0 3 3 0 016 0z');
+        $('gear-icon').innerHTML =
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />';
       }
     });
 
-    /**
-     * Config editor rendering (safe: avoids breaking HTML when template contains quotes)
-     */
+    // ------------- CONFIG EDITOR -------------
+
     function renderConfigEditor() {
       const list = $('config-editor-list');
       list.innerHTML = '';
-      setStatus(`Loaded ${state.templates.length} templates (${state.templatesSource}).`);
-
-      state.templates.forEach((t, index) => {
+      state.templates.forEach((t, i) => {
         const card = document.createElement('div');
         card.className = "bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 space-y-4";
-
-        const header = document.createElement('div');
-        header.className = "flex flex-col md:flex-row gap-4 items-center";
-
-        const num = document.createElement('span');
-        num.className = "text-slate-600 font-black text-xl italic w-10";
-        num.textContent = `#${t.id}`;
-
-        const nameInput = document.createElement('input');
-        nameInput.type = "text";
-        nameInput.value = t.name;
-        nameInput.className = "flex-1 bg-slate-900 border border-slate-700 p-4 rounded-2xl text-blue-400 font-bold outline-none focus:border-blue-500";
-        nameInput.addEventListener('input', (e) => {
-          state.templates[index].name = e.target.value;
-        });
-
-        header.appendChild(num);
-        header.appendChild(nameInput);
-
-        const textarea = document.createElement('textarea');
-        textarea.className = "w-full h-64 bg-slate-950 border border-slate-800 p-6 rounded-3xl text-xs font-mono text-slate-400 outline-none focus:text-slate-100 transition-colors";
-        textarea.placeholder = "Paste the HTML code here...";
-        textarea.value = t.html;
-        textarea.addEventListener('input', (e) => {
-          state.templates[index].html = e.target.value;
-        });
-
-        card.appendChild(header);
-        card.appendChild(textarea);
+        card.innerHTML = `
+          <div class="flex flex-col md:flex-row gap-4 items-center">
+            <span class="text-slate-600 font-black text-xl italic w-10">#${t.id}</span>
+            <input type="text" value="${t.name.replace(/"/g, '&quot;')}" oninput="updateTempName(${i}, this.value)"
+              class="flex-1 bg-slate-900 border border-slate-700 p-4 rounded-2xl text-blue-400 font-bold outline-none focus:border-blue-500">
+          </div>
+          <textarea oninput="updateTempHtml(${i}, this.value)"
+            class="w-full h-64 bg-slate-950 border border-slate-800 p-6 rounded-3xl text-xs font-mono text-slate-500 outline-none focus:text-slate-200 transition-colors"
+            placeholder="Paste the HTML code here...">${t.html}</textarea>
+        `;
         list.appendChild(card);
       });
     }
 
-    /**
-     * Save / Reset
-     */
+    window.updateTempName = (i, val) => { state.templates[i].name = val; };
+    window.updateTempHtml = (i, val) => { state.templates[i].html = val; };
+
     $('btn-save-config').addEventListener('click', async () => {
-      const btn = $('btn-save-config');
-      const original = btn.textContent;
-
       try {
-        btn.disabled = true;
-        btn.textContent = "Saving...";
-        setStatus("Saving to Supabase…");
-
-        await apiSaveTemplates(state.templates);
-
-        // keep a cache backup
-        localStorage.setItem(STORAGE_KEYS.TEMPLATES_CACHE, JSON.stringify(state.templates));
-        state.templatesSource = "api";
-        setTemplatesSourceLabel();
-
-        setStatus("Saved successfully.");
-        toast("Templates saved!");
+        await apiSaveTemplates(state.templates, state.selectedProgramSlug);
+        alert("Templates saved to Supabase!");
       } catch (err) {
-        setStatus("Save failed: " + (err?.message || String(err)));
-        alert("Error saving templates:\n\n" + (err?.message || String(err)) +
-              "\n\nIf you see 401: set localStorage eb_admin_token to match ADMIN_TOKEN in Vercel.");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = original;
+        alert("Error saving templates: " + (err?.message || String(err)));
       }
     });
 
     $('btn-reset').addEventListener('click', () => {
-      if (confirm("Are you sure? This clears local brand + local cache and reloads.\n\nNote: it does NOT delete templates from Supabase.")) {
-        localStorage.removeItem(STORAGE_KEYS.BRAND);
-        localStorage.removeItem(STORAGE_KEYS.TEMPLATES_CACHE);
-        // optional: also remove admin token locally
-        // localStorage.removeItem(STORAGE_KEYS.ADMIN_TOKEN);
+      if (confirm("Are you sure? This will clear localStorage data (brand state) for this browser.")) {
+        localStorage.removeItem('eb_brand_db');
         location.reload();
       }
     });
 
-    /**
-     * Generator logic
-     */
+    // ------------- GENERATOR LOGIC -------------
+
     function checkValidations() {
-      const inputs = document.querySelectorAll('.brand-input');
-      const allFilled = Array.from(inputs).every(input => input.value.trim() !== "");
+      const inputs = Array.from(document.querySelectorAll('.brand-input'));
       const btn = $('btn-generate');
+
+      const visibleInputs = inputs.filter(input => input.offsetParent !== null);
+      const allFilled = visibleInputs.every(input => input.value.trim() !== "");
 
       if (allFilled) {
         btn.disabled = false;
         btn.classList.remove('bg-slate-200', 'text-slate-400', 'cursor-not-allowed');
         btn.classList.add('bg-blue-600', 'text-white', 'shadow-xl', 'shadow-blue-200', 'cursor-pointer');
-        btn.innerText = "Generate Templates";
+        btn.innerText = state.isGenerating ? "Generating…" : "Generate Templates";
       } else {
-        btn.disabled = true;
+        btn.disabled = false; // se valida en el click
         btn.classList.remove('bg-blue-600', 'text-white', 'shadow-xl', 'shadow-blue-200', 'cursor-pointer');
-        btn.classList.add('bg-slate-200', 'text-slate-400', 'cursor-not-allowed');
-        btn.innerText = "Enable Generator";
+        btn.classList.add('bg-slate-200', 'text-slate-400', 'cursor-pointer');
+        btn.innerText = "Enable / Validate";
       }
     }
 
-    document.querySelectorAll('.brand-input').forEach(i => i.addEventListener('input', checkValidations));
+    document.querySelectorAll('.brand-input').forEach(i =>
+      i.addEventListener('input', checkValidations)
+    );
 
-    $('btn-generate').addEventListener('click', () => {
+    $('btn-generate').addEventListener('click', async () => {
+      // limpiar errores previos
+      state.invalidFields = [];
+      document.querySelectorAll('.brand-input').forEach(input => {
+        input.classList.remove('border-red-300', 'bg-red-50');
+      });
+
+      const inputs = Array.from(document.querySelectorAll('.brand-input'));
+      const visibleInputs = inputs.filter(input => input.offsetParent !== null);
+      const invalid = visibleInputs.filter(input => input.value.trim() === "");
+
+      if (invalid.length > 0) {
+        state.invalidFields = invalid.map(i => i.id);
+        invalid.forEach(input => {
+          input.classList.add('border-red-300', 'bg-red-50');
+        });
+        alert("Please fill all visible fields before generating.");
+        return;
+      }
+
+      // spinner
       saveBrandState();
-      renderResultsButtons();
+      state.isGenerating = true;
+      const btn = $('btn-generate');
+      btn.innerHTML = `
+        <span class="inline-flex items-center justify-center gap-2">
+          <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+          </svg>
+          Generating…
+        </span>
+      `;
+      btn.disabled = true;
+
+      try {
+        renderResultsButtons();
+      } finally {
+        state.isGenerating = false;
+        btn.disabled = false;
+        btn.innerText = "Generate Templates";
+        checkValidations();
+      }
     });
 
     function saveBrandState() {
@@ -488,7 +487,7 @@
         carecoaching_initial: $('carecoaching_initial').value,
         carecoaching_refill: $('carecoaching_refill').value
       };
-      localStorage.setItem(STORAGE_KEYS.BRAND, JSON.stringify(state.brand));
+      localStorage.setItem('eb_brand_db', JSON.stringify(state.brand));
     }
 
     function renderResultsButtons() {
@@ -507,115 +506,93 @@
       };
 
       state.templates.forEach(t => {
-        let finalHtml = String(t.html || '');
+        let finalHtml = t.html;
         Object.keys(replacements).forEach(key => {
-          const regex = new RegExp(`{{${escapeRegExp(key)}}}`, 'g');
-          finalHtml = finalHtml.replace(regex, replacements[key] ?? '');
+          const regex = new RegExp(`{{${key}}}`, 'g');
+          finalHtml = finalHtml.replace(regex, replacements[key]);
         });
 
         const btn = document.createElement('button');
         btn.className =
           "flex items-center justify-between p-6 bg-white border border-slate-200 rounded-3xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group shadow-sm active:scale-[0.99]";
-
-        const left = document.createElement('div');
-        left.className = "flex flex-col gap-1";
-
-        const small = document.createElement('span');
-        small.className = "text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none";
-        small.textContent = `Template #${t.id}`;
-
-        const name = document.createElement('span');
-        name.className = "font-bold text-slate-700 leading-tight group-hover:text-blue-600";
-        name.textContent = t.name;
-
-        left.appendChild(small);
-        left.appendChild(name);
-
-        const right = document.createElement('div');
-        right.className = "flex items-center gap-2";
-
-        const label = document.createElement('span');
-        label.className = "text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-all uppercase italic tracking-tighter";
-        label.textContent = "Copy HTML";
-
-        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        icon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-        icon.setAttribute("class", "h-5 w-5 text-slate-300 group-hover:text-blue-500");
-        icon.setAttribute("fill", "none");
-        icon.setAttribute("viewBox", "0 0 24 24");
-        icon.setAttribute("stroke", "currentColor");
-        icon.innerHTML = `
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+        btn.innerHTML = `
+          <div class="flex flex-col gap-1">
+            <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Template #${t.id}</span>
+            <span class="font-bold text-slate-700 leading-tight group-hover:text-blue-600">${t.name}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-all uppercase italic tracking-tighter">Copy HTML</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300 group-hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+          </div>
         `;
 
-        right.appendChild(label);
-        right.appendChild(icon);
-
-        btn.appendChild(left);
-        btn.appendChild(right);
-
-        btn.addEventListener('click', () => copyToClipboard(finalHtml, btn));
+        btn.onclick = () => copyToClipboard(finalHtml, btn);
         grid.appendChild(btn);
       });
     }
 
-    /**
-     * Helpers
-     */
-    function escapeRegExp(str) {
-      return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
+    // ------------- HELPERS -------------
 
     function formatPhoneNumber(raw) {
-      const cleaned = ('' + (raw ?? '')).replace(/\D/g, '');
+      const cleaned = ('' + raw).replace(/\D/g, '');
       const match = cleaned.match(/^(1|)?(\d{3})(\d{3})(\d{4})$/);
-      return match ? `(${match[2]}) ${match[3]}-${match[4]}` : (raw ?? '');
+      return match ? `(${match[2]}) ${match[3]}-${match[4]}` : raw;
     }
 
-    async function copyToClipboard(text, btn) {
-      const original = btn.innerHTML;
+    function copyToClipboard(text, btn) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
 
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          // fallback
-          const textArea = document.createElement("textarea");
-          textArea.value = text;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-        }
-
-        btn.innerHTML = `<span class="w-full text-center text-emerald-600 font-bold text-xs uppercase animate-pulse">HTML copied successfully!</span>`;
-        btn.classList.add('border-emerald-500', 'bg-emerald-50');
-        setTimeout(() => {
-          btn.innerHTML = original;
-          btn.classList.remove('border-emerald-500', 'bg-emerald-50');
-        }, 1100);
-      } catch (e) {
-        alert("Copy failed. Your browser may block clipboard access.");
-      }
+      const originalContent = btn.innerHTML;
+      btn.innerHTML = `<span class="w-full text-center text-emerald-600 font-bold text-xs uppercase animate-pulse">HTML copied successfully!</span>`;
+      btn.classList.add('border-emerald-500', 'bg-emerald-50');
+      setTimeout(() => {
+        btn.innerHTML = originalContent;
+        btn.classList.remove('border-emerald-500', 'bg-emerald-50');
+      }, 1200);
     }
 
-    /**
-     * Color sync
-     */
+    function normalizeHexColor(v) {
+      let value = String(v || "").trim();
+      if (!value) return "";
+      if (!value.startsWith('#')) value = '#' + value;
+      value = value.toUpperCase();
+      return value;
+    }
+
     $('color_picker').addEventListener('input', (e) => {
-      $('brand_color').value = String(e.target.value || '').toUpperCase();
+      const normalized = normalizeHexColor(e.target.value);
+      $('brand_color').value = normalized;
       checkValidations();
     });
 
     $('brand_color').addEventListener('input', (e) => {
-      const v = String(e.target.value || '').trim();
-      if (/^#?[0-9A-Fa-f]{6}$/.test(v)) {
-        const hex = v.startsWith('#') ? v : ('#' + v);
-        $('color_picker').value = hex;
-      }
+      const normalized = normalizeHexColor(e.target.value);
+      e.target.value = normalized;
+      $('color_picker').value = normalized || '#000000';
       checkValidations();
     });
+
+    $('logo_url').addEventListener('input', (e) => {
+      const url = (e.target.value || '').trim();
+      const img = $('logo_preview');
+      if (!url) {
+        img.style.display = 'none';
+        img.src = '';
+        return;
+      }
+      img.style.display = 'block';
+      img.src = url;
+    });
+
+    // ------------- START -------------
 
     init();
   </script>
