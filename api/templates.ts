@@ -6,27 +6,36 @@ const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-// Función helper para obtener el program_id desde slug o query
-async function getProgramId(searchParams: URLSearchParams) {
-  const slug = searchParams.get("program_slug") || "default";
+function requireAdmin(req: Request) {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (adminToken && req.headers.get("x-admin-token") !== adminToken) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  return null;
+}
+
+async function getProgramIdBySlug(slug: string) {
+  const programSlug = (slug || "default").trim() || "default";
 
   const { data, error } = await supabase
     .from("programs")
     .select("id")
-    .eq("slug", slug)
+    .eq("slug", programSlug)
     .maybeSingle();
 
-  if (error) throw error;
-  if (!data) throw new Error(`Program with slug "${slug}" not found`);
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`Program not found for slug: ${programSlug}`);
+
   return data.id as number;
 }
 
-export async function GET(request: Request) {
+// GET /api/templates?program_slug=default
+export async function GET(req: Request) {
   try {
-    const url = new URL(request.url);
-    const searchParams = url.searchParams;
+    const url = new URL(req.url);
+    const programSlug = url.searchParams.get("program_slug") || "default";
 
-    const programId = await getProgramId(searchParams);
+    const programId = await getProgramIdBySlug(programSlug);
 
     const { data, error } = await supabase
       .from("email_templates")
@@ -47,14 +56,13 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+// POST /api/templates  { program_slug: "default", templates: [...] }
+export async function POST(req: Request) {
   try {
-    const adminToken = process.env.ADMIN_TOKEN;
-    if (adminToken && request.headers.get("x-admin-token") !== adminToken) {
-      return Response.json({ error: "unauthorized" }, { status: 401 });
-    }
+    const auth = requireAdmin(req);
+    if (auth) return auth;
 
-    const body = await request.json().catch(() => null);
+    const body = await req.json().catch(() => null);
     const templates = body?.templates;
     const programSlug = body?.program_slug || "default";
 
@@ -65,32 +73,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // buscamos program_id por slug
-    const { data: program, error: programError } = await supabase
-      .from("programs")
-      .select("id")
-      .eq("slug", programSlug)
-      .maybeSingle();
+    const programId = await getProgramIdBySlug(programSlug);
 
-    if (programError) throw programError;
-    if (!program) {
-      return Response.json(
-        { error: `Program with slug "${programSlug}" not found` },
-        { status: 400 }
-      );
-    }
-
-    const programId = program.id as number;
-
-    // nos aseguramos de que cada template tenga program_id correcto
-    const templatesWithProgram = templates.map((t: any) => ({
-      ...t,
+    // Asegurar program_id en cada fila
+    const payload = templates.map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      html: t.html,
       program_id: programId
     }));
 
     const { error } = await supabase
       .from("email_templates")
-      .upsert(templatesWithProgram, { onConflict: "id" });
+      .upsert(payload, { onConflict: "id" });
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
