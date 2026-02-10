@@ -253,6 +253,11 @@
       </button>
     </div>
   </div>
+
+  <div id="fields-list" class="grid grid-cols-1 gap-3">
+    <!-- Dynamic fields rows -->
+  </div>
+</div>
 <!-- MODAL: Create Program -->
 <div id="modal-create-program" class="hidden fixed inset-0 z-[9999]" style="pointer-events:none;">
   <!-- backdrop -->
@@ -286,12 +291,6 @@
     </div>
   </div>
 </div>
-
-  <div id="fields-list" class="grid grid-cols-1 gap-3">
-    <!-- Dynamic fields rows -->
-  </div>
-</div>
-
       <div class="grid grid-cols-1 gap-8 custom-scrollbar" id="config-editor-list">
         <!-- Dynamic -->
       </div>
@@ -954,12 +953,6 @@ function setCreateProgramError(msg) {
   err.textContent = msg;
   err.classList.remove('hidden');
 }
-
-document.getElementById('btn-add-program')?.addEventListener('click', (e) => {
-  console.log('PLUS CLICK handler fired', {target: e.target, time: Date.now()});
-  // keep original call so behavior tries to open modal
-  try { openCreateProgramModal(); } catch (err) { console.error('openCreateProgramModal error', err); }
-});
 
 // close on backdrop click
 document.getElementById('modal-create-program-backdrop')?.addEventListener('click', () => {
