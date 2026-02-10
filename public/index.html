@@ -221,10 +221,13 @@
       <!-- Tabs dinámicos -->
     </div>
 
-    <button id="btn-add-program"
-      class="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-800/60 border border-slate-700/60 hover:border-slate-500 text-slate-200 font-black text-xl">
-      +
-    </button>
+    <button
+  id="btn-add-program"
+  onclick="window.openCreateProgramModal && window.openCreateProgramModal()"
+  class="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-800/60 border border-slate-700/60 hover:border-slate-500 text-slate-200 font-black text-xl"
+  type="button"
+  aria-label="Add program"
+>+</button>
   </div>
 </div>
 
