@@ -31,6 +31,29 @@
   /* --- FIX 2: guarantee "+" is clickable even if something overlays --- */
 #program-tabs { position: relative; z-index: 20; }
 #btn-add-program { position: relative; z-index: 30; }
+
+   /* --- Generate button feedback (like Copy feedback) --- */
+  .btn-generating {
+    background-color: #2563eb !important; /* blue-600 */
+    color: #ffffff !important;
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.20) !important;
+  }
+
+  .btn-generated {
+    background-color: #16a34a !important; /* green-600 */
+    color: #ffffff !important;
+    box-shadow: 0 12px 28px rgba(22, 163, 74, 0.25) !important;
+  }
+
+  @keyframes btnPop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
+
+  .btn-pop {
+    animation: btnPop 220ms ease-out;
+  } 
   </style>
 </head>
 
@@ -768,6 +791,8 @@ function escapeAttr(str) {
     function checkValidations() {
       const inputs = Array.from(document.querySelectorAll('.brand-input'));
       const btn = $('btn-generate');
+      // Si estamos mostrando feedback (generating/success), no tocar el botón
+if (btn?.dataset?.feedback) return;
 
       const visibleInputs = inputs.filter(input => input.offsetParent !== null);
       const allFilled = visibleInputs.every(input => input.value.trim() !== "");
@@ -788,13 +813,101 @@ function escapeAttr(str) {
     document.querySelectorAll('.brand-input').forEach(i =>
       i.addEventListener('input', checkValidations)
     );
+function setGenerateButtonMode(mode) {
+  const btn = $('btn-generate');
+  if (!btn) return;
 
+  // Limpia estado anterior
+  btn.classList.remove('btn-generating', 'btn-generated', 'btn-pop');
+
+  if (mode === 'idle') {
+    delete btn.dataset.feedback;
+    btn.disabled = false;
+    checkValidations(); // vuelve al estado normal (Enable/Generate)
+    return;
+  }
+
+  // Bloquea para que checkValidations no lo pise
+  btn.dataset.feedback = mode;
+  btn.classList.add('btn-pop');
+
+  if (mode === 'generating') {
+    btn.disabled = true;
+    btn.classList.add('btn-generating');
+    btn.innerHTML = `
+      <span class="inline-flex items-center justify-center gap-2">
+        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+        </svg>
+        Generating…
+      </span>
+    `;
+    return;
+  }
+
+  if (mode === 'success') {
+    btn.disabled = true;
+    btn.classList.add('btn-generated');
+    btn.innerHTML = `
+      <span class="inline-flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span class="animate-pulse">Templates generated</span>
+      </span>
+    `;
+
+    // Después de 1.2s vuelve al estado normal
+    window.setTimeout(() => {
+      btn.classList.remove('btn-generated', 'btn-pop');
+      delete btn.dataset.feedback;
+      btn.disabled = false;
+      checkValidations();
+    }, 1200);
+
+    return;
+  }
+}
     $('btn-generate').addEventListener('click', async () => {
-      // limpiar errores previos
-      state.invalidFields = [];
-      document.querySelectorAll('.brand-input').forEach(input => {
-        input.classList.remove('border-red-300', 'bg-red-50');
-      });
+  // limpiar errores previos
+  state.invalidFields = [];
+  document.querySelectorAll('.brand-input').forEach(input => {
+    input.classList.remove('border-red-300', 'bg-red-50');
+  });
+
+  const inputs = Array.from(document.querySelectorAll('.brand-input'));
+  const visibleInputs = inputs.filter(input => input.offsetParent !== null);
+  const invalid = visibleInputs.filter(input => input.value.trim() === "");
+
+  if (invalid.length > 0) {
+    state.invalidFields = invalid.map(i => i.id);
+    invalid.forEach(input => {
+      input.classList.add('border-red-300', 'bg-red-50');
+    });
+    alert("Please fill all visible fields before generating.");
+    return;
+  }
+
+  saveBrandState();
+  state.isGenerating = true;
+
+  // ✅ feedback generating
+  setGenerateButtonMode('generating');
+
+  try {
+    renderResultsButtons();
+
+    // ✅ feedback success (similar a copy)
+    setGenerateButtonMode('success');
+  } catch (e) {
+    console.error(e);
+    setGenerateButtonMode('idle');
+    alert("Error generating templates: " + (e?.message || String(e)));
+  } finally {
+    state.isGenerating = false;
+  }
+});
 
       const inputs = Array.from(document.querySelectorAll('.brand-input'));
       const visibleInputs = inputs.filter(input => input.offsetParent !== null);
