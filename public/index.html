@@ -952,8 +952,10 @@ function setCreateProgramError(msg) {
   err.classList.remove('hidden');
 }
 
-document.getElementById('btn-add-program')?.addEventListener('click', () => {
-  openCreateProgramModal();
+document.getElementById('btn-add-program')?.addEventListener('click', (e) => {
+  console.log('PLUS CLICK handler fired', {target: e.target, time: Date.now()});
+  // keep original call so behavior tries to open modal
+  try { openCreateProgramModal(); } catch (err) { console.error('openCreateProgramModal error', err); }
 });
 
 // close on backdrop click
