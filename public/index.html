@@ -137,24 +137,9 @@
           </div>
 
           <div class="pt-6 border-t border-slate-100 space-y-4">
-            <label class="block text-[10px] font-bold text-indigo-500 uppercase tracking-widest ml-1">Links & Endpoints</label>
-
-            <!-- Extra fields condicionados por programa -->
-            <div class="field-wrapper program-extra" data-field="portal_url">
-              <input type="text" id="portal_url" placeholder="Portal URL"
-                class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
-            </div>
-
-            <div class="field-wrapper program-extra" data-field="carecoaching_initial">
-              <input type="text" id="carecoaching_initial" placeholder="Care Coaching - Initial booking URL"
-                class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
-            </div>
-
-            <div class="field-wrapper program-extra" data-field="carecoaching_refill">
-              <input type="text" id="carecoaching_refill" placeholder="Care Coaching - Refill booking URL"
-                class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs italic outline-none">
-            </div>
-          </div>
+  <!-- Dynamic fields per program (rendered from Program Fields) -->
+  <div id="program-extra-fields" class="space-y-4"></div>
+</div>
         </div>
 
         <button id="btn-generate"
@@ -534,17 +519,60 @@ function getSelectedProgram() {
     }
 
     function updateProgramFieldsVisibility() {
-      const current = state.programs.find(p => p.slug === state.selectedProgramSlug);
-      const visibleSet = new Set(current ? current.extraFields : []);
+  const program = state.programs.find(p => p.slug === state.selectedProgramSlug) || getSelectedProgram();
+  const container = document.getElementById('program-extra-fields');
+  if (!container) return;
 
-      document.querySelectorAll('.program-extra').forEach(wrapper => {
-        const field = wrapper.getAttribute('data-field');
-        if (visibleSet.has(field)) {
-          wrapper.classList.remove('hidden');
-        } else {
-          wrapper.classList.add('hidden');
-        }
-      });
+  container.innerHTML = '';
+
+  const fields = Array.isArray(program?.fields) ? program.fields : [];
+  const extras = fields.filter(f => !f.is_core);
+
+  if (!extras.length) {
+    checkValidations();
+    return;
+  }
+
+  // valores guardados previos (para repoblar inputs)
+  const savedBrand = JSON.parse(localStorage.getItem('eb_brand_db') || "{}");
+
+  extras.forEach(f => {
+    const key = String(f.key || '').trim();
+    if (!key) return;
+
+    const label = f.label || key;
+
+    // Evita ids duplicados si alguien crea una key repetida
+    if (document.getElementById(key)) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = "field-wrapper";
+    wrapper.innerHTML = `
+      <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">
+        ${escapeHtml(label)}
+      </label>
+      <input
+        type="text"
+        id="${escapeAttr(key)}"
+        placeholder="${escapeAttr(label)}"
+        class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs outline-none"
+      />
+    `;
+
+    container.appendChild(wrapper);
+
+    const input = wrapper.querySelector('input');
+    if (input) {
+      // repoblar si ya existía algo guardado
+      if (savedBrand[key] != null) input.value = savedBrand[key];
+
+      // para que validación reaccione
+      input.addEventListener('input', checkValidations);
+    }
+  });
+
+  checkValidations();
+}
     }
 
     // ------------- NAVIGATION LOGIC -------------
@@ -560,11 +588,15 @@ function getSelectedProgram() {
         $('gear-icon').innerHTML =
           '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />';
       } else {
-        renderResultsButtons();
-        $('gear-icon').innerHTML =
-          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />' +
-          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />';
-      }
+  // Render extra inputs del programa actual
+  updateProgramFieldsVisibility();
+  checkValidations();
+
+  renderResultsButtons();
+  $('gear-icon').innerHTML =
+    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 ..."/>' +
+    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 ..."/>';
+}
     });
 
     // ---------- FIELDS EDITOR UI ----------
@@ -804,18 +836,29 @@ function escapeAttr(str) {
     });
 
     function saveBrandState() {
-      state.brand = {
-        brand_name: $('brand_name').value,
-        brand_color: $('brand_color').value,
-        logo_url: $('logo_url').value,
-        support_email: $('support_email').value,
-        support_phone_raw: $('support_phone_raw').value,
-        portal_url: $('portal_url').value,
-        carecoaching_initial: $('carecoaching_initial').value,
-        carecoaching_refill: $('carecoaching_refill').value
-      };
-      localStorage.setItem('eb_brand_db', JSON.stringify(state.brand));
-    }
+  const brandVisible = {};
+  const allInputs = Array.from(document.querySelectorAll('.brand-input'));
+
+  // Solo inputs visibles (los del programa actual)
+  allInputs
+    .filter(input => input.id && input.offsetParent !== null)
+    .forEach(input => {
+      brandVisible[input.id] = input.value;
+    });
+
+  // normaliza color si viene sin #
+  if (brandVisible.brand_color) {
+    brandVisible.brand_color = normalizeHexColor(brandVisible.brand_color);
+  }
+
+  // guardamos en localStorage MERGEADO (para recordar valores aunque cambies programa)
+  const prev = JSON.parse(localStorage.getItem('eb_brand_db') || "{}");
+  const merged = { ...prev, ...brandVisible };
+  localStorage.setItem('eb_brand_db', JSON.stringify(merged));
+
+  // state.brand lo dejamos con el merge para reemplazos
+  state.brand = merged;
+}
 
     function renderResultsButtons() {
       const grid = $('grid-results');
