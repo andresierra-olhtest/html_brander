@@ -27,6 +27,10 @@
 }
 #program-tabs { position: relative; z-index: 2; }
 #btn-add-program { position: relative; z-index: 3; }
+
+  /* --- FIX 2: guarantee "+" is clickable even if something overlays --- */
+#program-tabs { position: relative; z-index: 20; }
+#btn-add-program { position: relative; z-index: 30; }
   </style>
 </head>
 
@@ -247,7 +251,7 @@
     </div>
   </div>
 <!-- MODAL: Create Program -->
-<div id="modal-create-program" class="hidden fixed inset-0 z-50">
+<div id="modal-create-program" class="hidden fixed inset-0 z-[9999]" style="pointer-events:none;">
   <!-- backdrop -->
   <div id="modal-create-program-backdrop" class="absolute inset-0 bg-black/50"></div>
 
@@ -920,18 +924,25 @@ function openCreateProgramModal() {
 
   if (!modal || !input || !err) return;
 
+  // enable interactions
+  modal.style.pointerEvents = "auto";
+
   err.classList.add('hidden');
   err.textContent = '';
   input.value = '';
 
   modal.classList.remove('hidden');
 
-  // focus input
   setTimeout(() => input.focus(), 50);
 }
 
 function closeCreateProgramModal() {
-  document.getElementById('modal-create-program')?.classList.add('hidden');
+  const modal = document.getElementById('modal-create-program');
+  if (modal) {
+    modal.classList.add('hidden');
+    // disable interactions when hidden
+    modal.style.pointerEvents = "none";
+  }
 }
 
 function setCreateProgramError(msg) {
