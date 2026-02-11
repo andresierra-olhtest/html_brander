@@ -909,44 +909,6 @@ function setGenerateButtonMode(mode) {
   }
 });
 
-      const inputs = Array.from(document.querySelectorAll('.brand-input'));
-      const visibleInputs = inputs.filter(input => input.offsetParent !== null);
-      const invalid = visibleInputs.filter(input => input.value.trim() === "");
-
-      if (invalid.length > 0) {
-        state.invalidFields = invalid.map(i => i.id);
-        invalid.forEach(input => {
-          input.classList.add('border-red-300', 'bg-red-50');
-        });
-        alert("Please fill all visible fields before generating.");
-        return;
-      }
-
-      // spinner
-      saveBrandState();
-      state.isGenerating = true;
-      const btn = $('btn-generate');
-      btn.innerHTML = `
-        <span class="inline-flex items-center justify-center gap-2">
-          <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
-          </svg>
-          Generating…
-        </span>
-      `;
-      btn.disabled = true;
-
-      try {
-        renderResultsButtons();
-      } finally {
-        state.isGenerating = false;
-        btn.disabled = false;
-        btn.innerText = "Generate Templates";
-        checkValidations();
-      }
-    });
-
     function saveBrandState() {
   const brandVisible = {};
   const allInputs = Array.from(document.querySelectorAll('.brand-input'));
