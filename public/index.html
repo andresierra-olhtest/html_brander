@@ -73,19 +73,26 @@
       </div>
 
       <div class="flex gap-2">
-        <button id="btn-toggle-config"
-          class="p-3 rounded-2xl bg-white shadow-sm border border-slate-200 hover:shadow-md transition-all group"
-          title="Edit templates">
-          <svg id="gear-icon" xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6 text-slate-600 group-hover:rotate-90 transition-transform duration-500" fill="none"
-            viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-      </div>
+  <!-- NEW: Connect / Fetch Tellescope templates -->
+  <button id="btn-tellescope"
+    class="p-3 rounded-2xl bg-white shadow-sm border border-slate-200 hover:shadow-md transition-all relative"
+    title="Connect Tellescope">
+    <span id="tellescope-dot" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-slate-300"></span>
+    <!-- icon (puedes cambiarlo) -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M13.828 10.172a4 4 0 015.657 5.657l-1.414 1.414a4 4 0 01-5.657-5.657m-3.172 3.172a4 4 0 01-5.657-5.657l1.414-1.414a4 4 0 015.657 5.657" />
+    </svg>
+  </button>
+
+  <!-- Existing -->
+  <button id="btn-toggle-config"
+    class="p-3 rounded-2xl bg-white shadow-sm border border-slate-200 hover:shadow-md transition-all group"
+    title="Edit templates">
+    ...
+  </button>
+</div>
+
     </header>
 
     <!-- VIEW: GENERATOR (DEFAULT) -->
@@ -169,6 +176,11 @@
           class="w-full mt-10 py-5 rounded-3xl font-bold bg-slate-200 text-slate-400 cursor-pointer uppercase text-xs tracking-[0.2em] transition-all transform active:scale-[0.98]">
           Enable / Validate
         </button>
+        
+        <button id="btn-push-tellescope"
+  class="hidden w-full mt-3 py-5 rounded-3xl font-bold bg-slate-900 text-white cursor-pointer uppercase text-xs tracking-[0.2em] transition-all transform active:scale-[0.98]">
+  Push to Tellescope
+</button>
 
         <p class="mt-4 text-[10px] text-slate-400 leading-relaxed">
           Tip: If you still see old text after pasting updates, it's usually cached files or old localStorage values.
@@ -351,6 +363,11 @@
       ],
       selectedProgramSlug: "default",
       selectedProgramId: null,
+      tellescopeApiKey: "",                 // SOLO memoria (no localStorage)
+tellescopeBusinessId: localStorage.getItem('eb_ts_business_id') || "",
+tellescopeTemplates: [],              // lista traída de Tellescope
+tellescopeMatches: {},                // { [localTemplateId]: tellescopeTemplateId } para programa actual
+
     };
 
     // ------------- API HELPERS -------------
@@ -376,6 +393,106 @@
       if (!res.ok) throw new Error(json.error || 'POST /api/templates failed');
       return true;
     }
+function tsMatchesStorageKey() {
+  const biz = state.tellescopeBusinessId || "no_biz";
+  const prog = state.selectedProgramSlug || "default";
+  return `eb_ts_matches_v1__${biz}__${prog}`;
+}
+
+function loadTsMatches() {
+  try {
+    const raw = localStorage.getItem(tsMatchesStorageKey());
+    state.tellescopeMatches = raw ? JSON.parse(raw) : {};
+  } catch {
+    state.tellescopeMatches = {};
+  }
+}
+
+function saveTsMatches() {
+  try {
+    localStorage.setItem(tsMatchesStorageKey(), JSON.stringify(state.tellescopeMatches || {}));
+  } catch {}
+}
+
+function countTsMatches() {
+  return Object.values(state.tellescopeMatches || {}).filter(Boolean).length;
+}
+
+function getTsTemplateId(tpl) {
+  return tpl?.id || tpl?._id || tpl?.templateId || tpl?.originalId || "";
+}
+
+function getTsTemplateLabel(tpl) {
+  return tpl?.title || tpl?.name || tpl?.subject || getTsTemplateId(tpl) || "Untitled";
+}
+
+async function tellescopeFetchTemplates(apiKey, businessId) {
+  const res = await fetch("/api/tellescope/templates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey, businessId, limit: 200, sort: "newFirst" }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Failed to fetch Tellescope templates");
+
+  return Array.isArray(json.templates) ? json.templates : [];
+}
+
+function updateTellescopeDot() {
+  const dot = document.getElementById('tellescope-dot');
+  if (!dot) return;
+
+  const connected = (state.tellescopeTemplates?.length || 0) > 0;
+  dot.classList.remove('bg-slate-300', 'bg-emerald-500');
+  dot.classList.add(connected ? 'bg-emerald-500' : 'bg-slate-300');
+}
+
+function updatePushButtonVisibility() {
+  const btn = document.getElementById('btn-push-tellescope');
+  if (!btn) return;
+
+  const matches = countTsMatches();
+  const shouldShow = matches > 0; // tu regla: mostrar solo si hay al menos 1 match
+
+  btn.classList.toggle('hidden', !shouldShow);
+  if (shouldShow) {
+    btn.textContent = `Push to Tellescope (${matches})`;
+  }
+}
+
+// Modal open/close
+function openTellescopeModal() {
+  const modal = document.getElementById('modal-tellescope');
+  const api = document.getElementById('ts_api_key');
+  const biz = document.getElementById('ts_business_id');
+  const err = document.getElementById('modal-tellescope-error');
+  if (!modal || !api || !biz || !err) return;
+
+  modal.style.pointerEvents = "auto";
+  modal.classList.remove('hidden');
+
+  err.classList.add('hidden');
+  err.textContent = "";
+
+  biz.value = state.tellescopeBusinessId || "";
+  api.value = ""; // siempre vacío por seguridad
+  setTimeout(() => api.focus(), 50);
+}
+
+function closeTellescopeModal() {
+  const modal = document.getElementById('modal-tellescope');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.style.pointerEvents = "none";
+}
+
+function setTellescopeModalError(msg) {
+  const err = document.getElementById('modal-tellescope-error');
+  if (!err) return;
+  err.textContent = msg;
+  err.classList.remove('hidden');
+}
 
     // --- PROGRAMS API ---
 async function apiGetPrograms() {
@@ -934,49 +1051,133 @@ function setGenerateButtonMode(mode) {
   state.brand = merged;
 }
 
-    function renderResultsButtons() {
-      const grid = $('grid-results');
-      const placeholder = $('placeholder-empty');
+    function buildFinalHtmlForTemplate(t) {
+  const replacements = {
+    ...state.brand,
+    support_phone_formatted: formatPhoneNumber(state.brand.support_phone_raw)
+  };
 
-      if (!state.brand.brand_name) return;
+  let finalHtml = t.html;
+  Object.keys(replacements).forEach(key => {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    finalHtml = finalHtml.replace(regex, replacements[key] ?? "");
+  });
+  return finalHtml;
+}
 
-      grid.innerHTML = '';
-      placeholder.classList.add('hidden');
-      grid.classList.remove('hidden');
+function renderResultsButtons() {
+  const grid = $('grid-results');
+  const placeholder = $('placeholder-empty');
 
-      const replacements = {
-        ...state.brand,
-        support_phone_formatted: formatPhoneNumber(state.brand.support_phone_raw)
-      };
+  // Mantén tu lógica actual: si no hay brand_name, no mostramos cards
+  if (!state.brand.brand_name) return;
 
-      state.templates.forEach(t => {
-        let finalHtml = t.html;
-        Object.keys(replacements).forEach(key => {
-          const regex = new RegExp(`{{${key}}}`, 'g');
-          finalHtml = finalHtml.replace(regex, replacements[key]);
-        });
+  grid.innerHTML = '';
+  placeholder.classList.add('hidden');
+  grid.classList.remove('hidden');
 
-        const btn = document.createElement('button');
-        btn.className =
-          "flex items-center justify-between p-6 bg-white border border-slate-200 rounded-3xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group shadow-sm active:scale-[0.99]";
-        btn.innerHTML = `
-          <div class="flex flex-col gap-1">
-            <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Template #${t.id}</span>
-            <span class="font-bold text-slate-700 leading-tight group-hover:text-blue-600">${t.name}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-all uppercase italic tracking-tighter">Copy HTML</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300 group-hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-            </svg>
-          </div>
-        `;
+  const tsEnabled = Array.isArray(state.tellescopeTemplates) && state.tellescopeTemplates.length > 0;
 
-        btn.onclick = () => copyToClipboard(finalHtml, btn);
-        grid.appendChild(btn);
+  // Ordena templates de Tellescope por label (opcional)
+  const tsSorted = (state.tellescopeTemplates || []).slice().sort((a,b) => {
+    return getTsTemplateLabel(a).localeCompare(getTsTemplateLabel(b));
+  });
+
+  state.templates.forEach(t => {
+    const finalHtml = buildFinalHtmlForTemplate(t);
+
+    const card = document.createElement('div');
+    card.className =
+      "relative flex items-center justify-between p-6 bg-white border border-slate-200 rounded-3xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group shadow-sm";
+    
+    // copy toast
+    const toast = document.createElement('div');
+    toast.className = "copy-toast hidden absolute right-4 top-4 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-500 text-emerald-700 text-xs font-bold";
+    toast.textContent = "HTML copied!";
+    card.appendChild(toast);
+
+    // left
+    const left = document.createElement('div');
+    left.className = "flex flex-col gap-1 min-w-0";
+    left.innerHTML = `
+      <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Template #${t.id}</span>
+      <span class="font-bold text-slate-700 leading-tight group-hover:text-blue-600 truncate">${t.name}</span>
+    `;
+    card.appendChild(left);
+
+    // right
+    const right = document.createElement('div');
+    right.className = "flex items-center gap-3 flex-shrink-0";
+    card.appendChild(right);
+
+    // Match select (solo si ya hiciste fetch)
+    if (tsEnabled) {
+      const select = document.createElement('select');
+      select.className = "ts-match-select border border-slate-200 rounded-2xl text-[10px] px-3 py-2 bg-white font-bold max-w-[240px]";
+      
+      const opt0 = document.createElement('option');
+      opt0.value = "";
+      opt0.textContent = "Match Tellescope…";
+      select.appendChild(opt0);
+
+      tsSorted.forEach(ts => {
+        const id = getTsTemplateId(ts);
+        if (!id) return;
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = getTsTemplateLabel(ts);
+        select.appendChild(opt);
       });
+
+      // set selected match (si existe)
+      const current = (state.tellescopeMatches || {})[t.id];
+      if (current) select.value = current;
+
+      select.addEventListener('click', (e) => e.stopPropagation());
+      select.addEventListener('change', () => {
+        const value = select.value || "";
+        state.tellescopeMatches = state.tellescopeMatches || {};
+
+        if (!value) delete state.tellescopeMatches[t.id];
+        else state.tellescopeMatches[t.id] = value;
+
+        saveTsMatches();
+        updatePushButtonVisibility();
+      });
+
+      right.appendChild(select);
     }
+
+    // Copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.type = "button";
+    copyBtn.className = "copy-btn p-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50";
+    copyBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+      </svg>
+    `;
+    copyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyToClipboard(finalHtml, card);
+    });
+    right.appendChild(copyBtn);
+
+    // Opcional: click en toda la card también copia (excepto select/copybtn)
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.ts-match-select')) return;
+      if (e.target.closest('.copy-btn')) return;
+      copyToClipboard(finalHtml, card);
+    });
+
+    grid.appendChild(card);
+  });
+
+  updateTellescopeDot();
+  updatePushButtonVisibility();
+}
+
 
     // ------------- HELPERS -------------
 
@@ -986,22 +1187,28 @@ function setGenerateButtonMode(mode) {
       return match ? `(${match[2]}) ${match[3]}-${match[4]}` : raw;
     }
 
-    function copyToClipboard(text, btn) {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
+    async function copyToClipboard(text, cardEl) {
+  // intenta Clipboard API
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // fallback
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+  }
 
-      const originalContent = btn.innerHTML;
-      btn.innerHTML = `<span class="w-full text-center text-emerald-600 font-bold text-xs uppercase animate-pulse">HTML copied successfully!</span>`;
-      btn.classList.add('border-emerald-500', 'bg-emerald-50');
-      setTimeout(() => {
-        btn.innerHTML = originalContent;
-        btn.classList.remove('border-emerald-500', 'bg-emerald-50');
-      }, 1200);
-    }
+  // feedback (toast dentro de la card)
+  const toast = cardEl?.querySelector?.('.copy-toast');
+  if (toast) {
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 1200);
+  }
+}
+
 
     function normalizeHexColor(v) {
       let value = String(v || "").trim();
@@ -1132,6 +1339,47 @@ document.addEventListener('keydown', (e) => {
   if (!modal || modal.classList.contains('hidden')) return;
   if (e.key === 'Escape') closeCreateProgramModal();
 });
+<!-- MODAL: Connect Tellescope -->
+<div id="modal-tellescope" class="hidden fixed inset-0 z-[9999]" style="pointer-events:none;">
+  <div id="modal-tellescope-backdrop" class="absolute inset-0 bg-black/50"></div>
+
+  <div class="relative w-full h-full flex items-center justify-center p-6">
+    <div class="w-full max-w-md bg-white rounded-[2rem] shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="p-6 space-y-2">
+        <h3 class="text-xl font-extrabold text-slate-900">Connect Tellescope</h3>
+        <p class="text-sm text-slate-600">Enter API key and Business ID to fetch templates.</p>
+      </div>
+
+      <div class="px-6 pb-6 space-y-4">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">API Key</label>
+          <input id="ts_api_key" type="password" placeholder="API_KEY ..."
+            class="w-full border border-slate-200 p-3.5 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all">
+          <p class="mt-1 text-[10px] text-slate-400">We won’t store the API key in localStorage.</p>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1">Business ID</label>
+          <input id="ts_business_id" type="text" placeholder="e.g. 68ecf91754c0e1989763c55d"
+            class="w-full border border-slate-200 p-3.5 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all">
+        </div>
+
+        <p id="modal-tellescope-error" class="hidden text-sm text-red-600 font-semibold"></p>
+      </div>
+
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+        <button id="btn-cancel-tellescope"
+          class="px-5 py-3 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold">
+          Cancel
+        </button>
+        <button id="btn-confirm-tellescope"
+          class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold shadow-sm">
+          Fetch templates
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 
     // ------------- START -------------
