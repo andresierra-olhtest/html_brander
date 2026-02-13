@@ -819,30 +819,32 @@ updatePushButtonVisibility();
   checkValidations();
 }
 
-    // ------------- NAVIGATION LOGIC -------------
+   // ------------- NAVIGATION LOGIC -------------
 
-    const btnToggleConfig = $('btn-toggle-config');
-    btnToggleConfig.addEventListener('click', () => {
-      const isEditing = document.body.classList.toggle('config-mode');
-      $('view-generator').classList.toggle('hidden');
-      $('view-config').classList.toggle('hidden');
+const btnToggleConfig = $('btn-toggle-config');
 
-      if (isEditing) {
-        renderConfigEditor();
-        const gear = $('gear-icon');
-if (gear) {
-  gear.innerHTML = '<path ... />';
-} else {
-  // Render extra inputs del programa actual
-  updateProgramFieldsVisibility();
-  checkValidations();
+btnToggleConfig?.addEventListener('click', () => {
+  const viewGen = $('view-generator');
+  const viewCfg = $('view-config');
 
-  renderResultsButtons();
- const gear = $('gear-icon');
-if (gear) {
-  gear.innerHTML = '<path ... />';
-}
-    });
+  const isEditing = document.body.classList.toggle('config-mode');
+
+  // show/hide vistas de forma explícita (más robusto que toggle simple)
+  if (isEditing) {
+    viewGen?.classList.add('hidden');
+    viewCfg?.classList.remove('hidden');
+
+    renderProgramTabs();
+    renderConfigEditor();
+  } else {
+    viewCfg?.classList.add('hidden');
+    viewGen?.classList.remove('hidden');
+
+    updateProgramFieldsVisibility();
+    checkValidations();
+    renderResultsButtons();
+  }
+});
 
     document.getElementById("btn-push-tellescope")?.addEventListener("click", async () => {
   const btn = document.getElementById("btn-push-tellescope");
