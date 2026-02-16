@@ -477,8 +477,20 @@ async function tellescopeFetchTemplates(apiKey, businessId) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || "Failed to fetch Tellescope templates");
 
-  return Array.isArray(json.templates) ? json.templates : [];
+  // ✅ Soporta múltiples shapes de respuesta posibles
+  const templates =
+    (Array.isArray(json.templates) && json.templates) ||
+    (Array.isArray(json?.data?.templates) && json.data.templates) ||
+    (Array.isArray(json?.result?.templates) && json.result.templates) ||
+    (Array.isArray(json?.results) && json.results) ||
+    (Array.isArray(json?.items) && json.items) ||
+    (Array.isArray(json?.data) && json.data) ||
+    (Array.isArray(json?.templates?.templates) && json.templates.templates) ||
+    [];
+
+  return templates;
 }
+
 
 function updateTellescopeDot() {
   const dot = document.getElementById('tellescope-dot');
@@ -565,18 +577,24 @@ document.getElementById('btn-confirm-tellescope')?.addEventListener('click', asy
     localStorage.setItem('eb_ts_business_id', businessId);
 
     const templates = await tellescopeFetchTemplates(apiKey, businessId);
-    state.tellescopeTemplates = templates;
 
-    // refresca matches (depende de businessId+program)
-    loadTsMatches();
+if (!templates.length) {
+  setTellescopeModalError("No templates returned. Check API key / Business ID (or endpoint response shape).");
+  return; // ✅ NO cerrar modal si no trajo nada
+}
 
-    updateTellescopeDot();
-    updatePushButtonVisibility();
+state.tellescopeTemplates = templates;
 
-    // si ya estás mostrando cards, re-render
-    renderResultsButtons();
+// refresca matches (depende de businessId+program)
+loadTsMatches();
 
-    closeTellescopeModal();
+updateTellescopeDot();
+updatePushButtonVisibility();
+
+// re-render de cards para que aparezca el dropdown
+renderResultsButtons();
+
+closeTellescopeModal();
   } catch (e) {
     setTellescopeModalError(e?.message || String(e));
   } finally {
