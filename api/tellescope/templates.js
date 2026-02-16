@@ -114,11 +114,12 @@ module.exports = async (req, res) => {
 
     // ✅ normaliza templates
     const templates =
-      (Array.isArray(parsed.templates) && parsed.templates) ||
-      (Array.isArray(parsed?.data?.templates) && parsed.data.templates) ||
-      (Array.isArray(parsed?.results) && parsed.results) ||
-      (Array.isArray(parsed?.items) && parsed.items) ||
-      [];
+  (Array.isArray(parsed) && parsed) || // ✅ <-- ESTA ES LA CLAVE (respuesta tipo array)
+  (Array.isArray(parsed.templates) && parsed.templates) ||
+  (Array.isArray(parsed?.data?.templates) && parsed.data.templates) ||
+  (Array.isArray(parsed?.results) && parsed.results) ||
+  (Array.isArray(parsed?.items) && parsed.items) ||
+  [];
 
     // Si vino 200 pero sin lista, devuelvo error con debug opcional
     if (!templates.length) {
