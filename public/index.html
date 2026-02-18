@@ -54,6 +54,19 @@
   .btn-pop {
     animation: btnPop 220ms ease-out;
   } 
+
+  /* Highlighted textarea overlay */
+.hl-textarea textarea{
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: #e2e8f0; /* cursor visible en dark */
+}
+.hl-textarea textarea::selection{
+  background: rgba(59,130,246,0.35);
+}
+.hl-textarea pre{
+  pointer-events: none;
+}
   </style>
 </head>
 
@@ -231,6 +244,11 @@
         class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-500 shadow-xl shadow-blue-900/20 transition-all uppercase text-[10px] tracking-widest">
         Save Changes
       </button>
+
+      <button id="btn-add-template"
+  class="px-5 py-3 rounded-2xl bg-white text-slate-900 font-extrabold border border-slate-300 hover:border-slate-400 hover:bg-slate-50 transition-all uppercase text-[10px] tracking-widest shadow-sm">
+  + Add Template
+</button>
     </div>
   </div>
 
@@ -1039,31 +1057,165 @@ function escapeHtml(str) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
   }[m]));
 }
+function highlightPlaceholdersToHtml(rawText) {
+  const escaped = escapeHtml(rawText || "");
+  // resalta {{...}} en rojo
+  return escaped.replace(/\{\{[^}]+\}\}/g, (m) => {
+    return `<span class="text-red-400 font-extrabold">${m}</span>`;
+  });
+}
 function escapeAttr(str) {
   return escapeHtml(str).replace(/"/g, "&quot;");
 }
 
     // ------------- CONFIG EDITOR -------------
+let templatesSortable = null;
 
-    function renderConfigEditor() {
-      const list = $('config-editor-list');
-      list.innerHTML = '';
-      state.templates.forEach((t, i) => {
-        const card = document.createElement('div');
-        card.className = "bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 space-y-4";
-        card.innerHTML = `
-          <div class="flex flex-col md:flex-row gap-4 items-center">
-            <span class="text-slate-600 font-black text-xl italic w-10">#${t.id}</span>
-            <input type="text" value="${t.name.replace(/"/g, '&quot;')}" oninput="updateTempName(${i}, this.value)"
-              class="flex-1 bg-slate-900 border border-slate-700 p-4 rounded-2xl text-blue-400 font-bold outline-none focus:border-blue-500">
-          </div>
-          <textarea oninput="updateTempHtml(${i}, this.value)"
-            class="w-full h-64 bg-slate-950 border border-slate-800 p-6 rounded-3xl text-xs font-mono text-slate-500 outline-none focus:text-slate-200 transition-colors"
-            placeholder="Paste the HTML code here...">${t.html}</textarea>
-        `;
-        list.appendChild(card);
-      });
+function nextTemplateId() {
+  const nums = (state.templates || [])
+    .map(t => Number(t.id))
+    .filter(n => Number.isFinite(n));
+  const max = nums.length ? Math.max(...nums) : 0;
+  return max + 1;
+}
+
+function deleteTemplateById(id) {
+  if (!confirm("Delete this template?")) return;
+
+  state.templates = (state.templates || []).filter(t => String(t.id) !== String(id));
+
+  // Si ese template estaba matcheado a Tellescope, borra el match
+  if (state.tellescopeMatches && state.tellescopeMatches[id]) {
+    delete state.tellescopeMatches[id];
+    saveTsMatches();
+    updatePushButtonVisibility();
+  }
+
+  renderConfigEditor();
+  renderResultsButtons(); // para que el generator se mantenga consistente
+}
+
+function initTemplatesSortable() {
+  const list = document.getElementById('config-editor-list');
+  if (!list || typeof Sortable === 'undefined') return;
+
+  // Si ya existe, destrúyelo (renderConfigEditor se llama varias veces)
+  if (templatesSortable) {
+    templatesSortable.destroy();
+    templatesSortable = null;
+  }
+
+  templatesSortable = new Sortable(list, {
+    animation: 150,
+    handle: '.drag-handle',
+    onEnd: () => {
+      const idsInDomOrder = Array.from(list.children)
+        .map(el => el.dataset.templateId)
+        .filter(Boolean);
+
+      const byId = new Map((state.templates || []).map(t => [String(t.id), t]));
+      state.templates = idsInDomOrder.map(id => byId.get(String(id))).filter(Boolean);
+
+      // Re-render para que el #1 #2 #3 refleje el nuevo orden visual
+      renderConfigEditor();
     }
+  });
+}
+    function renderConfigEditor() {
+  const list = document.getElementById('config-editor-list');
+  if (!list) return;
+
+  list.innerHTML = '';
+
+  (state.templates || []).forEach((t, idx) => {
+    const card = document.createElement('div');
+    card.className = "bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 space-y-4";
+    card.dataset.templateId = String(t.id);
+
+    // Header row: drag + number + name + delete
+    const header = document.createElement('div');
+    header.className = "flex flex-col md:flex-row gap-4 items-center";
+
+    const left = document.createElement('div');
+    left.className = "flex items-center gap-3 w-full";
+
+    // drag handle
+    const drag = document.createElement('button');
+    drag.type = "button";
+    drag.className = "drag-handle cursor-grab active:cursor-grabbing text-slate-300 px-2 py-2 rounded-xl bg-slate-900/60 border border-slate-700/60";
+    drag.title = "Drag to reorder";
+    drag.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M7 4h2v2H7V4zm4 0h2v2h-2V4zM7 9h2v2H7V9zm4 0h2v2h-2V9zM7 14h2v2H7v-2zm4 0h2v2h-2v-2z"/>
+      </svg>
+    `;
+
+    // number (visual order)
+    const num = document.createElement('span');
+    num.className = "text-slate-600 font-black text-xl italic w-10";
+    num.textContent = `#${idx + 1}`;
+
+    // name input
+    const nameInput = document.createElement('input');
+    nameInput.type = "text";
+    nameInput.value = t.name || "";
+    nameInput.className = "flex-1 bg-slate-900 border border-slate-700 p-4 rounded-2xl text-blue-400 font-bold outline-none focus:border-blue-500 w-full";
+    nameInput.addEventListener('input', () => {
+      const tpl = (state.templates || []).find(x => String(x.id) === String(t.id));
+      if (tpl) tpl.name = nameInput.value;
+    });
+
+    left.appendChild(drag);
+    left.appendChild(num);
+    left.appendChild(nameInput);
+
+    // delete
+    const del = document.createElement('button');
+    del.type = "button";
+    del.className = "px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 font-extrabold uppercase text-[10px] tracking-widest";
+    del.textContent = "Delete";
+    del.addEventListener('click', () => deleteTemplateById(t.id));
+
+    header.appendChild(left);
+    header.appendChild(del);
+
+    // Highlighted editor (pre + textarea overlay)
+    const editorWrap = document.createElement('div');
+    editorWrap.className = "hl-textarea relative w-full h-64 rounded-3xl bg-slate-950 border border-slate-800 overflow-hidden";
+
+    const pre = document.createElement('pre');
+    pre.className = "absolute inset-0 m-0 p-6 overflow-auto text-xs font-mono text-slate-500 whitespace-pre-wrap break-words leading-6";
+    pre.innerHTML = highlightPlaceholdersToHtml(t.html || "");
+
+    const ta = document.createElement('textarea');
+    ta.className = "absolute inset-0 m-0 p-6 overflow-auto resize-none text-xs font-mono leading-6 outline-none";
+    ta.spellcheck = false;
+    ta.value = t.html || "";
+
+    // input: actualiza state + highlight
+    ta.addEventListener('input', () => {
+      const tpl = (state.templates || []).find(x => String(x.id) === String(t.id));
+      if (tpl) tpl.html = ta.value;
+      pre.innerHTML = highlightPlaceholdersToHtml(ta.value);
+    });
+
+    // scroll sync
+    ta.addEventListener('scroll', () => {
+      pre.scrollTop = ta.scrollTop;
+      pre.scrollLeft = ta.scrollLeft;
+    });
+
+    editorWrap.appendChild(pre);
+    editorWrap.appendChild(ta);
+
+    card.appendChild(header);
+    card.appendChild(editorWrap);
+
+    list.appendChild(card);
+  });
+
+  initTemplatesSortable();
+}
 
     window.updateTempName = (i, val) => { state.templates[i].name = val; };
     window.updateTempHtml = (i, val) => { state.templates[i].html = val; };
@@ -1560,10 +1712,20 @@ document.addEventListener('keydown', (e) => {
   if (!modal || modal.classList.contains('hidden')) return;
   if (e.key === 'Escape') closeCreateProgramModal();
 });
-
+document.getElementById('btn-add-template')?.addEventListener('click', () => {
+  const newId = nextTemplateId();
+  state.templates = state.templates || [];
+  state.templates.push({
+    id: newId,
+    name: `New Template ${newId}`,
+    html: `<!-- Paste your HTML here -->\n<div>Hello {{brand_name}}</div>`
+  });
+  renderConfigEditor();
+});
     // ------------- START -------------
 
     init();
   </script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </body>
 </html>
