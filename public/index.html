@@ -786,9 +786,9 @@ updatePushButtonVisibility();
 
       // si panel abierto, refrescarlo
       const panel = document.getElementById('fields-editor-panel');
-      if (panel && !panel.classList.contains('hidden')) {
-        ();
-      }
+if (panel && !panel.classList.contains('hidden')) {
+  renderFieldsEditor();
+}
     };
 
     tabs.appendChild(btn);
@@ -1078,7 +1078,7 @@ function renderFieldsEditor() {
   if (!program || !list) return;
 
   program.fields = Array.isArray(program.fields) ? program.fields : [];
-  program.fields.sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999));
+  program.fields.sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const core = program.fields.filter(f => f.is_core);
   const extras = program.fields.filter(f => !f.is_core);
@@ -1086,10 +1086,10 @@ function renderFieldsEditor() {
   list.innerHTML = '';
 
   // -------------------------
-  // CORE (bloqueados)
+  // CORE (locked, no toggle)
   // -------------------------
   core.forEach((f) => {
-    // seguridad: core nunca puede ser form link
+    // seguridad: core nunca debe ser form link
     f.is_form_link = false;
 
     const row = document.createElement('div');
@@ -1099,8 +1099,10 @@ function renderFieldsEditor() {
 
     row.innerHTML = `
       <div class="text-slate-200 font-bold">${escapeHtml(f.label)}</div>
+
       <input disabled value="${escapeAttr(f.key)}"
         class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
+
       <div class="text-slate-500 text-[10px] font-extrabold uppercase tracking-widest justify-self-end">
         Core field
       </div>
@@ -1113,50 +1115,70 @@ function renderFieldsEditor() {
   // EXTRAS (editable + toggle)
   // -------------------------
   extras.forEach((f) => {
-    f.is_form_link = !!f.is_form_link;
+    if (typeof f.is_form_link === "undefined") f.is_form_link = false;
 
     const row = document.createElement('div');
     row.className =
-      "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_0.8fr_auto] gap-3 items-center " +
+      "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_auto] gap-3 items-center " +
       "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
     row.innerHTML = `
       <input value="${escapeAttr(f.label)}"
-        class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
         placeholder="Label (e.g. Portal URL)" />
 
       <input value="${escapeAttr(f.key)}"
-        class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
         placeholder="placeholder key (e.g. portal_url)" />
 
-      <label class="flex items-center gap-2 text-xs text-slate-300 font-bold select-none">
-        <input type="checkbox" class="pf-toggle form-link-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
-        <span>Form link</span>
-      </label>
+      <div class="flex items-center justify-between gap-3">
+        <label class="inline-flex items-center gap-2 text-xs text-slate-300 font-bold select-none">
+          <input type="checkbox" class="form-link-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
+          <span>Form link</span>
+        </label>
 
-      <button class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
-        Delete
-      </button>
+        <button type="button"
+          class="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
+          Delete
+        </button>
+      </div>
     `;
 
-    const labelInput = row.querySelector('.pf-label');
-    const keyInput = row.querySelector('.pf-key');
-    const toggle = row.querySelector('.pf-toggle');
-    const delBtn = row.querySelector('.pf-del');
+    const labelInput = row.querySelectorAll('input')[0];
+    const keyInput   = row.querySelectorAll('input')[1];
+    const toggle      = row.querySelector('.form-link-toggle');
+    const delBtn      = row.querySelector('button');
 
-    labelInput?.addEventListener('input', (e) => {
+    labelInput.addEventListener('input', (e) => {
       f.label = e.target.value;
     });
 
-    keyInput?.addEventListener('input', (e) => {
-      f.key = e.target.value.replace(/\s+/g, '_');
+    keyInput.addEventListener('input', (e) => {
+      const oldKey = String(f.key || "").trim();
+      const newKey = e.target.value.replace(/\s+/g,'_');
+      f.key = newKey;
+      if (e.target.value !== newKey) e.target.value = newKey;
+
+      // Si ya había un match guardado con oldKey, muévelo al nuevo key
+      if (oldKey && oldKey !== newKey && state.tellescopeFormMatches?.[oldKey]) {
+        state.tellescopeFormMatches[newKey] = state.tellescopeFormMatches[oldKey];
+        delete state.tellescopeFormMatches[oldKey];
+        saveTsFormMatches();
+      }
     });
 
-    toggle?.addEventListener('change', (e) => {
+    toggle.addEventListener('change', (e) => {
       f.is_form_link = !!e.target.checked;
+
+      // Opcional: si apagaron form link, podrías borrar el match guardado
+      // const k = String(f.key || "").trim();
+      // if (!f.is_form_link && k && state.tellescopeFormMatches?.[k]) {
+      //   delete state.tellescopeFormMatches[k];
+      //   saveTsFormMatches();
+      // }
     });
 
-    delBtn?.addEventListener('click', () => {
+    delBtn.addEventListener('click', () => {
       program.fields = program.fields.filter(x => x !== f);
       renderFieldsEditor();
     });
@@ -1562,7 +1584,7 @@ function setGenerateButtonMode(mode) {
 
   // Solo inputs visibles (los del programa actual)
   allInputs
-    .filter(input => input.id && input.offsetParent !== null)
+    .filter(input => input.id && input.offsetParent !== null && !input.dataset.formLink)
     .forEach(input => {
       brandVisible[input.id] = input.value;
     });
