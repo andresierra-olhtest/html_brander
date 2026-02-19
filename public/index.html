@@ -380,6 +380,34 @@
   <script>
     // ------------- HELPERS -------------
     const $ = (id) => document.getElementById(id);
+// ✅ Anclar helpers en window (evita problemas de scope / caché / module)
+if (typeof window.escapeHtml !== "function") {
+  window.escapeHtml = function escapeHtml(str = "") {
+    return String(str || "").replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    }[m]));
+  };
+}
+
+if (typeof window.escapeAttr !== "function") {
+  window.escapeAttr = function escapeAttr(str = "") {
+    return window.escapeHtml(str).replace(/"/g, "&quot;");
+  };
+}
+
+if (typeof window.highlightPlaceholdersToHtml !== "function") {
+  window.highlightPlaceholdersToHtml = function highlightPlaceholdersToHtml(rawText = "") {
+    const escaped = window.escapeHtml(rawText || "");
+    return escaped.replace(/\{\{[^}]+\}\}/g, (m) => {
+      return `<span class="text-red-400 font-extrabold">${m}</span>`;
+    });
+  };
+}
+    
 // ---------------------------
 // HTML/Placeholder helpers (GLOBAL)
 // ---------------------------
@@ -402,6 +430,45 @@ function highlightPlaceholdersToHtml(rawText) {
   // resalta {{...}} en rojo
   return escaped.replace(/\{\{[^}]+\}\}/g, (m) => {
     return `<span class="text-red-400 font-extrabold">${m}</span>`;
+  });
+}
+function keyToLabel(key) {
+  return String(key || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function normalizePrograms(programs) {
+  return (Array.isArray(programs) ? programs : []).map((p) => {
+    const prog = { ...p };
+
+    // ✅ compatibilidad: extraFields -> fields
+    if (!Array.isArray(prog.fields) && Array.isArray(prog.extraFields)) {
+      prog.fields = prog.extraFields.map((key, idx) => ({
+        label: keyToLabel(key),
+        key,
+        is_core: false,
+        is_form_link: false,
+        sort_order: idx + 1,
+      }));
+    }
+
+    // ✅ asegurar fields siempre
+    prog.fields = Array.isArray(prog.fields) ? prog.fields : [];
+
+    // ✅ normaliza shape
+    prog.fields = prog.fields
+      .filter(Boolean)
+      .map((f, idx) => ({
+        label: f.label || keyToLabel(f.key),
+        key: String(f.key || "").trim(),
+        is_core: !!f.is_core,
+        is_form_link: !!f.is_form_link,
+        sort_order: f.sort_order ?? (idx + 1),
+      }))
+      .filter((f) => f.key);
+
+    return prog;
   });
 }
     const TEMPLATE_NAMES_LIST = [
@@ -747,16 +814,15 @@ async function apiUpdateProgramFields(programId, fields) {
     async function loadProgramsAndInitSelection() {
   // 1) intenta traer programas
   try {
-    const programs = await apiGetPrograms();
-    if (Array.isArray(programs) && programs.length) {
-      state.programs = programs;
-    } else {
-      console.warn("apiGetPrograms returned empty array. Using existing fallback state.programs.");
-    }
-  } catch (e) {
-    console.warn("GET /api/programs failed. Using fallback state.programs.", e);
-    // deja el fallback que ya tienes en state.programs
+  const programs = await apiGetPrograms();
+  if (Array.isArray(programs) && programs.length) {
+    state.programs = normalizePrograms(programs);
+  } else {
+    state.programs = normalizePrograms(state.programs); // fallback
   }
+} catch (e) {
+  state.programs = normalizePrograms(state.programs); // fallback
+}
 
   // 2) garantiza que haya al menos 1 programa
   if (!Array.isArray(state.programs) || !state.programs.length) {
@@ -1117,8 +1183,8 @@ function renderFieldsEditor() {
       "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
     row.innerHTML = `
-      <div class="text-slate-200 font-bold">${escapeHtml(f.label || '')}</div>
-      <input disabled value="${escapeAttr(f.key || '')}"
+      <div class="text-slate-200 font-bold">${window.escapeHtml(f.label || '')}</div>
+      <input disabled value="${window.escapeAttr(f.key || '')}"
         class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
       <div class="text-slate-500 text-[10px] font-extrabold uppercase tracking-widest justify-self-end">
         Core field
@@ -1342,7 +1408,7 @@ function initTemplatesSortable() {
 
     const pre = document.createElement('pre');
     pre.className = "absolute inset-0 m-0 p-6 overflow-auto text-xs font-mono text-slate-500 whitespace-pre-wrap break-words leading-6";
-    pre.innerHTML = highlightPlaceholdersToHtml(t.html || "");
+    pre.innerHTML = window.highlightPlaceholdersToHtml(t.html || "");
 
     const ta = document.createElement('textarea');
     ta.className = "absolute inset-0 m-0 p-6 overflow-auto resize-none text-xs font-mono leading-6 outline-none";
@@ -1353,7 +1419,7 @@ function initTemplatesSortable() {
     ta.addEventListener('input', () => {
       const tpl = (state.templates || []).find(x => String(x.id) === String(t.id));
       if (tpl) tpl.html = ta.value;
-      pre.innerHTML = highlightPlaceholdersToHtml(ta.value);
+      pre.innerHTML = window.highlightPlaceholdersToHtml(ta.value);
     });
 
     // scroll sync
