@@ -1052,17 +1052,16 @@ document.getElementById('btn-add-field')?.addEventListener('click', () => {
   addExtraField();
   renderFieldsEditor();
 });
-    
 
 document.getElementById('btn-save-fields')?.addEventListener('click', async () => {
   try {
     const program = getSelectedProgram();
     if (!program) throw new Error("Program not found");
 
-    // normaliza sort_order
     program.fields = Array.isArray(program.fields) ? program.fields : [];
     program.fields.forEach((f, i) => {
-      f.sort_order = f.is_core ? (f.sort_order ?? (i + 1)) : (f.sort_order ?? (i + 1));
+      if (f.sort_order == null) f.sort_order = i + 1;
+      if (f.is_core) f.is_form_link = false; // core nunca
     });
 
     await apiUpdateProgramFields(program.id, program.fields);
@@ -1085,11 +1084,8 @@ function renderFieldsEditor() {
 
   list.innerHTML = '';
 
-  // ---------------------------
-  // CORE FIELDS (LOCKED)
-  // ---------------------------
+  // CORE (locked, sin toggle)
   core.forEach((f) => {
-    // core nunca debe ser form link
     f.is_form_link = false;
 
     const row = document.createElement('div');
@@ -1099,21 +1095,16 @@ function renderFieldsEditor() {
 
     row.innerHTML = `
       <div class="text-slate-200 font-bold">${escapeHtml(f.label || '')}</div>
-
       <input disabled value="${escapeAttr(f.key || '')}"
         class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
-
       <div class="text-slate-500 text-[10px] font-extrabold uppercase tracking-widest justify-self-end">
         Core field
       </div>
     `;
-
     list.appendChild(row);
   });
 
-  // ---------------------------
-  // EXTRA FIELDS (EDITABLE + FORM LINK)
-  // ---------------------------
+  // EXTRAS (editable + toggle form link)
   extras.forEach((f) => {
     const row = document.createElement('div');
     row.className =
@@ -1121,26 +1112,18 @@ function renderFieldsEditor() {
       "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
     row.innerHTML = `
-      <input
-        class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
-        value="${escapeAttr(f.label || '')}"
-        placeholder="Label (e.g. Portal URL)"
-      />
+      <input class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+        value="${escapeAttr(f.label || '')}" placeholder="Label (e.g. Portal URL)" />
 
-      <input
-        class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
-        value="${escapeAttr(f.key || '')}"
-        placeholder="placeholder key (e.g. portal_url)"
-      />
+      <input class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+        value="${escapeAttr(f.key || '')}" placeholder="placeholder key (e.g. portal_url)" />
 
       <label class="inline-flex items-center gap-2 text-xs text-slate-200/80 font-bold select-none">
-        <input type="checkbox" class="pf-toggle accent-blue-500"
-          ${f.is_form_link ? "checked" : ""} />
+        <input type="checkbox" class="pf-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
         <span>Form link</span>
       </label>
 
-      <button type="button"
-        class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
+      <button type="button" class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
         Delete
       </button>
     `;
@@ -1150,17 +1133,14 @@ function renderFieldsEditor() {
     const toggle      = row.querySelector('.pf-toggle');
     const delBtn      = row.querySelector('.pf-del');
 
-    labelInput.addEventListener('input', (e) => {
-      f.label = e.target.value;
-    });
+    labelInput.addEventListener('input', (e) => { f.label = e.target.value; });
 
     keyInput.addEventListener('input', (e) => {
       const oldKey = String(f.key || '').trim();
-      const newKey = e.target.value.replace(/\s+/g, '_');
-
+      const newKey = e.target.value.replace(/\s+/g,'_');
       f.key = newKey;
 
-      // Si cambian el key y ya había match de form link, migra el match al nuevo key
+      // migra form match si existía
       if (oldKey && newKey && oldKey !== newKey) {
         const cur = state.tellescopeFormMatches?.[oldKey];
         if (cur) {
@@ -1174,7 +1154,7 @@ function renderFieldsEditor() {
     toggle.addEventListener('change', (e) => {
       f.is_form_link = !!e.target.checked;
 
-      // si lo apagó, limpia el match guardado para ese key
+      // si lo apaga, borra match
       const key = String(f.key || '').trim();
       if (!f.is_form_link && key && state.tellescopeFormMatches?.[key]) {
         delete state.tellescopeFormMatches[key];
@@ -1184,11 +1164,8 @@ function renderFieldsEditor() {
 
     delBtn.addEventListener('click', () => {
       const key = String(f.key || '').trim();
-
-      // borra field del programa
       program.fields = program.fields.filter(x => x !== f);
 
-      // borra match de forms si existía
       if (key && state.tellescopeFormMatches?.[key]) {
         delete state.tellescopeFormMatches[key];
         saveTsFormMatches();
@@ -1200,74 +1177,13 @@ function renderFieldsEditor() {
     list.appendChild(row);
   });
 
-  // botón + Add Field
+  // + Add Field disabled si >= 10 extras
   const addBtn = document.getElementById('btn-add-field');
   if (addBtn) {
     addBtn.disabled = extras.length >= 10;
     addBtn.classList.toggle('opacity-50', extras.length >= 10);
   }
 }
-
-  extras.forEach((f) => {
-  const row = document.createElement('div');
-  row.className =
-    "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_0.8fr_auto] gap-3 items-center " +
-    "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
-
-  row.innerHTML = `
-    <input
-      class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
-      value="${escapeAttr(f.label)}"
-      placeholder="Label (e.g. Portal URL)" />
-
-    <input
-      class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
-      value="${escapeAttr(f.key)}"
-      placeholder="placeholder key (e.g. portal_url)" />
-
-    <label class="flex items-center gap-2 text-slate-200/80 text-xs font-bold select-none">
-      <input type="checkbox" class="form-link-toggle w-4 h-4 rounded"
-        ${f.is_form_link ? "checked" : ""} />
-      <span>Form link</span>
-    </label>
-
-    <button class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
-      Delete
-    </button>
-  `;
-
-  const labelInput = row.querySelector('.pf-label');
-  const keyInput   = row.querySelector('.pf-key');
-  const toggle     = row.querySelector('.form-link-toggle');
-  const delBtn     = row.querySelector('.pf-del');
-
-  labelInput?.addEventListener('input', (e) => {
-    f.label = e.target.value;
-  });
-
-  keyInput?.addEventListener('input', (e) => {
-    f.key = e.target.value.replace(/\s+/g, '_');
-  });
-
-  // ✅ AQUÍ VA EL LISTENER DEL TOGGLE (exactamente aquí)
-  toggle?.addEventListener('change', (e) => {
-    f.is_form_link = !!e.target.checked;
-  });
-
-  delBtn?.addEventListener('click', () => {
-    program.fields = program.fields.filter(x => x !== f);
-    renderFieldsEditor();
-  });
-
-  list.appendChild(row);
-});
-
-  const addBtn = document.getElementById('btn-add-field');
-  if (addBtn) {
-    addBtn.disabled = extras.length >= 10;
-    addBtn.classList.toggle('opacity-50', extras.length >= 10);
-  }
-
 
 function addExtraField() {
   const program = getSelectedProgram();
@@ -1281,25 +1197,9 @@ function addExtraField() {
     label: "",
     key: "",
     is_core: false,
-    is_form_link: false,     // ✅ nuevo
+    is_form_link: false,
     sort_order: program.fields.length + 1
   });
-}
-
-function escapeHtml(str) {
-  return String(str || "").replace(/[&<>"']/g, (m) => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-  }[m]));
-}
-function highlightPlaceholdersToHtml(rawText) {
-  const escaped = escapeHtml(rawText || "");
-  // resalta {{...}} en rojo
-  return escaped.replace(/\{\{[^}]+\}\}/g, (m) => {
-    return `<span class="text-red-400 font-extrabold">${m}</span>`;
-  });
-}
-function escapeAttr(str) {
-  return escapeHtml(str).replace(/"/g, "&quot;");
 }
 
     // ------------- CONFIG EDITOR -------------
