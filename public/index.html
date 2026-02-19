@@ -380,7 +380,30 @@
   <script>
     // ------------- HELPERS -------------
     const $ = (id) => document.getElementById(id);
+// ---------------------------
+// HTML/Placeholder helpers (GLOBAL)
+// ---------------------------
+function escapeHtml(str) {
+  return String(str || "").replace(/[&<>"']/g, (m) => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#039;"
+  }[m]));
+}
 
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/"/g, "&quot;");
+}
+
+function highlightPlaceholdersToHtml(rawText) {
+  const escaped = escapeHtml(rawText || "");
+  // resalta {{...}} en rojo
+  return escaped.replace(/\{\{[^}]+\}\}/g, (m) => {
+    return `<span class="text-red-400 font-extrabold">${m}</span>`;
+  });
+}
     const TEMPLATE_NAMES_LIST = [
       "1 Days Before - Email", "1 Hour Before - Email", "2 Days Before - Email", "5 Minutes Before - Email",
       "Appointment Confirmation - Async - Email", "Appointment Confirmation - Sync - Email", "AVS SOAP - Email",
