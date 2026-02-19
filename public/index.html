@@ -426,7 +426,8 @@
 tellescopeBusinessId: localStorage.getItem('eb_ts_business_id') || "",
 tellescopeTemplates: [],              // lista traída de Tellescope
 tellescopeMatches: {},                // { [localTemplateId]: tellescopeTemplateId } para programa actual
-
+tellescopeForms: [],            // forms traídos de Tellescope
+tellescopeFormMatches: {},      // { [fieldKey]: formId } por programa actual
     };
 
     // ------------- API HELPERS -------------
@@ -473,6 +474,27 @@ function saveTsMatches() {
   } catch {}
 }
 
+function tsFormMatchesStorageKey() {
+  const biz = state.tellescopeBusinessId || "no_biz";
+  const prog = state.selectedProgramSlug || "default";
+  return `eb_ts_form_matches_v1__${biz}__${prog}`;
+}
+
+function loadTsFormMatches() {
+  try {
+    const raw = localStorage.getItem(tsFormMatchesStorageKey());
+    state.tellescopeFormMatches = raw ? JSON.parse(raw) : {};
+  } catch {
+    state.tellescopeFormMatches = {};
+  }
+}
+
+function saveTsFormMatches() {
+  try {
+    localStorage.setItem(tsFormMatchesStorageKey(), JSON.stringify(state.tellescopeFormMatches || {}));
+  } catch {}
+}
+    
 function countTsMatches() {
   return Object.values(state.tellescopeMatches || {}).filter(Boolean).length;
 }
@@ -509,6 +531,26 @@ async function tellescopeFetchTemplates(apiKey, businessId) {
   return templates;
 }
 
+function getTsFormId(form) {
+  return form?.id || form?._id || form?.formId || "";
+}
+
+function getTsFormLabel(form) {
+  return form?.title || form?.displayTitle || getTsFormId(form) || "Untitled form";
+}
+
+async function tellescopeFetchForms(apiKey, businessId) {
+  const res = await fetch("/api/tellescope/forms", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey, businessId, limit: 200, sort: "newFirst" }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Failed to fetch Tellescope forms");
+
+  return Array.isArray(json.forms) ? json.forms : (Array.isArray(json) ? json : []);
+}    
 
 function updateTellescopeDot() {
   const dot = document.getElementById('tellescope-dot');
@@ -594,24 +636,25 @@ document.getElementById('btn-confirm-tellescope')?.addEventListener('click', asy
     state.tellescopeBusinessId = businessId;
     localStorage.setItem('eb_ts_business_id', businessId);
 
-    const templates = await tellescopeFetchTemplates(apiKey, businessId);
-
-if (!templates.length) {
-  setTellescopeModalError("No templates returned. Check API key / Business ID (or endpoint response shape).");
-  return; // ✅ NO cerrar modal si no trajo nada
-}
+    const [templates, forms] = await Promise.all([
+  tellescopeFetchTemplates(apiKey, businessId),
+  tellescopeFetchForms(apiKey, businessId),
+]);
 
 state.tellescopeTemplates = templates;
+state.tellescopeForms = (forms || []).filter(f => !f?.disabled); // opcional: filtra disabled
 
-// refresca matches (depende de businessId+program)
 loadTsMatches();
+loadTsFormMatches();
 
 updateTellescopeDot();
 updatePushButtonVisibility();
 
-// re-render de cards para que aparezca el dropdown
-renderResultsButtons();
+// IMPORTANTÍSIMO: esto re-renderiza los inputs para que aparezcan los dropdowns
+updateProgramFieldsVisibility();
+checkValidations();
 
+renderResultsButtons();
 closeTellescopeModal();
   } catch (e) {
     setTellescopeModalError(e?.message || String(e));
@@ -718,6 +761,7 @@ function renderProgramTabs() {
     btn.onclick = async () => {
       state.selectedProgramSlug = p.slug;
       loadTsMatches();
+      loadTsFormMatches();
 updatePushButtonVisibility();
       state.selectedProgramId = p.id;
 
@@ -747,6 +791,7 @@ function getSelectedProgram() {
 
         await loadProgramsAndInitSelection();
       loadTsMatches();
+      loadTsFormMatches();
 updatePushButtonVisibility();
 updateTellescopeDot();
   renderProgramTabs();
@@ -763,6 +808,7 @@ updateTellescopeDot();
       programSelector.addEventListener('change', async (e) => {
         state.selectedProgramSlug = e.target.value;
         loadTsMatches();
+        loadTsFormMatches();
 updatePushButtonVisibility();
         await reloadTemplatesForCurrentProgram();
         updateProgramFieldsVisibility();
@@ -814,42 +860,83 @@ updatePushButtonVisibility();
     return;
   }
 
-  // valores guardados previos (para repoblar inputs)
   const savedBrand = JSON.parse(localStorage.getItem('eb_brand_db') || "{}");
+
+  // Forms list (si están synced)
+  const forms = (state.tellescopeForms || []).slice()
+    .filter(f => !f?.disabled) // opcional
+    .sort((a, b) => getTsFormLabel(a).localeCompare(getTsFormLabel(b)));
 
   extras.forEach(f => {
     const key = String(f.key || '').trim();
     if (!key) return;
 
-    const label = f.label || key;
-
-    // Evita ids duplicados si alguien crea una key repetida
-    if (document.getElementById(key)) return;
+    const label = (f.label || key).trim();
+    const isFormLink = !!f.is_form_link;
 
     const wrapper = document.createElement('div');
     wrapper.className = "field-wrapper";
-    wrapper.innerHTML = `
-      <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">
-        ${escapeHtml(label)}
-      </label>
-      <input
-        type="text"
-        id="${escapeAttr(key)}"
-        placeholder="${escapeAttr(label)}"
-        class="brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs outline-none"
-      />
-    `;
+
+    const lab = document.createElement('label');
+    lab.className = "block text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1";
+    lab.textContent = label;
+    wrapper.appendChild(lab);
+
+    if (isFormLink) {
+      const select = document.createElement('select');
+      select.id = key;
+      select.dataset.formLink = "1"; // para NO guardarlo como brand value
+      select.className = "brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs outline-none bg-white";
+
+      // placeholder option
+      const opt0 = document.createElement('option');
+      opt0.value = "";
+      opt0.textContent = forms.length ? "Select a Tellescope form…" : "Tellescope pending sync";
+      select.appendChild(opt0);
+
+      if (!forms.length) {
+        select.disabled = true;
+      } else {
+        select.disabled = false;
+        forms.forEach(form => {
+          const id = getTsFormId(form);
+          if (!id) return;
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = getTsFormLabel(form);
+          select.appendChild(opt);
+        });
+      }
+
+      // set value from localStorage mapping
+      const current = (state.tellescopeFormMatches || {})[key];
+      if (current) select.value = current;
+
+      select.addEventListener('change', () => {
+        const v = select.value || "";
+        state.tellescopeFormMatches = state.tellescopeFormMatches || {};
+        if (!v) delete state.tellescopeFormMatches[key];
+        else state.tellescopeFormMatches[key] = v;
+
+        saveTsFormMatches();
+        checkValidations();
+      });
+
+      wrapper.appendChild(select);
+    } else {
+      const input = document.createElement('input');
+      input.type = "text";
+      input.id = key;
+      input.placeholder = label;
+      input.className = "brand-input w-full border border-slate-200 p-3.5 rounded-2xl text-xs outline-none";
+
+      if (savedBrand[key] != null) input.value = savedBrand[key];
+      input.addEventListener('input', checkValidations);
+
+      wrapper.appendChild(input);
+    }
 
     container.appendChild(wrapper);
-
-    const input = wrapper.querySelector('input');
-    if (input) {
-      // repoblar si ya existía algo guardado
-      if (savedBrand[key] != null) input.value = savedBrand[key];
-
-      // para que validación reaccione
-      input.addEventListener('input', checkValidations);
-    }
   });
 
   checkValidations();
@@ -989,11 +1076,22 @@ function renderFieldsEditor() {
     const row = document.createElement('div');
     row.className = "grid grid-cols-1 md:grid-cols-3 gap-3 items-center bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
     row.innerHTML = `
-      <div class="text-slate-200 font-bold">${escapeHtml(f.label)}</div>
-      <div class="text-slate-400 text-xs">key</div>
-      <input disabled value="${escapeAttr(f.key)}"
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
-    `;
+  <input value="${escapeAttr(f.label)}"
+    class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+    placeholder="Label (e.g. Portal URL)" />
+  <input value="${escapeAttr(f.key)}"
+    class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+    placeholder="placeholder key (e.g. portal_url)" />
+  <div class="flex items-center justify-between gap-3">
+    <label class="inline-flex items-center gap-2 text-xs text-slate-300 font-bold">
+      <input type="checkbox" class="form-link-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
+      <span>Form link</span>
+    </label>
+    <button class="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
+      Delete
+    </button>
+  </div>
+`;
     list.appendChild(row);
   });
 
@@ -1015,12 +1113,18 @@ function renderFieldsEditor() {
       </div>
     `;
 
-    const [labelInput, keyInput] = row.querySelectorAll('input');
-    const delBtn = row.querySelector('button');
+    const labelInput = row.querySelectorAll('input')[0];
+const keyInput = row.querySelectorAll('input')[1];
+const toggle = row.querySelector('.form-link-toggle');
+const delBtn = row.querySelector('button');
 
     labelInput.addEventListener('input', (e) => { f.label = e.target.value; });
     keyInput.addEventListener('input', (e) => { f.key = e.target.value.replace(/\s+/g,'_'); });
 
+    toggle?.addEventListener('change', (e) => {
+  f.is_form_link = !!e.target.checked;
+});
+    
     delBtn.addEventListener('click', () => {
       program.fields = program.fields.filter(x => x !== f);
       renderFieldsEditor();
@@ -1048,6 +1152,7 @@ function addExtraField() {
     label: "",
     key: "",
     is_core: false,
+    is_form_link: false,     // ✅ nuevo
     sort_order: program.fields.length + 1
   });
 }
@@ -1384,22 +1489,41 @@ function setGenerateButtonMode(mode) {
   state.brand = merged;
 }
 
-    function buildFinalHtmlForTemplate(t) {
+   function escapeRegex(str) {
+  return String(str || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildFinalHtmlForTemplate(t) {
+  const program = getSelectedProgram();
+  const fields = Array.isArray(program?.fields) ? program.fields : [];
+
   const replacements = {
     ...state.brand,
     support_phone_formatted: formatPhoneNumber(state.brand.support_phone_raw)
   };
 
+  // ✅ para fields con form link: usamos el match formId y generamos sintaxis Tellescope
+  fields
+    .filter(f => !f.is_core && f.is_form_link)
+    .forEach(f => {
+      const key = String(f.key || '').trim();
+      if (!key) return;
+
+      const formId = (state.tellescopeFormMatches || {})[key];
+      if (!formId) return;
+
+      replacements[key] = `{{forms.${formId}.link:$LINK_ONLY}}`;
+    });
+
   let finalHtml = t.html;
 
   Object.keys(replacements).forEach(key => {
-    const regex = new RegExp(`{{${key}}}`, 'g');
+    const regex = new RegExp(`{{${escapeRegex(key)}}}`, 'g');
     finalHtml = finalHtml.replace(regex, () => String(replacements[key] ?? ""));
   });
 
   return finalHtml;
 }
-
 function renderResultsButtons() {
   const grid = $('grid-results');
   const placeholder = $('placeholder-empty');
