@@ -1085,11 +1085,11 @@ function renderFieldsEditor() {
 
   list.innerHTML = '';
 
-  // -------------------------
-  // CORE (locked, no toggle)
-  // -------------------------
+  // ---------------------------
+  // CORE FIELDS (LOCKED)
+  // ---------------------------
   core.forEach((f) => {
-    // seguridad: core nunca debe ser form link
+    // core nunca debe ser form link
     f.is_form_link = false;
 
     const row = document.createElement('div');
@@ -1098,9 +1098,9 @@ function renderFieldsEditor() {
       "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
     row.innerHTML = `
-      <div class="text-slate-200 font-bold">${escapeHtml(f.label)}</div>
+      <div class="text-slate-200 font-bold">${escapeHtml(f.label || '')}</div>
 
-      <input disabled value="${escapeAttr(f.key)}"
+      <input disabled value="${escapeAttr(f.key || '')}"
         class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
 
       <div class="text-slate-500 text-[10px] font-extrabold uppercase tracking-widest justify-self-end">
@@ -1111,81 +1111,96 @@ function renderFieldsEditor() {
     list.appendChild(row);
   });
 
-  // -------------------------
-  // EXTRAS (editable + toggle)
-  // -------------------------
+  // ---------------------------
+  // EXTRA FIELDS (EDITABLE + FORM LINK)
+  // ---------------------------
   extras.forEach((f) => {
-    if (typeof f.is_form_link === "undefined") f.is_form_link = false;
-
     const row = document.createElement('div');
     row.className =
-      "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_auto] gap-3 items-center " +
+      "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_0.9fr_auto] gap-3 items-center " +
       "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
     row.innerHTML = `
-      <input value="${escapeAttr(f.label)}"
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
-        placeholder="Label (e.g. Portal URL)" />
+      <input
+        class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+        value="${escapeAttr(f.label || '')}"
+        placeholder="Label (e.g. Portal URL)"
+      />
 
-      <input value="${escapeAttr(f.key)}"
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
-        placeholder="placeholder key (e.g. portal_url)" />
+      <input
+        class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+        value="${escapeAttr(f.key || '')}"
+        placeholder="placeholder key (e.g. portal_url)"
+      />
 
-      <div class="flex items-center justify-between gap-3">
-        <label class="inline-flex items-center gap-2 text-xs text-slate-300 font-bold select-none">
-          <input type="checkbox" class="form-link-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
-          <span>Form link</span>
-        </label>
+      <label class="inline-flex items-center gap-2 text-xs text-slate-200/80 font-bold select-none">
+        <input type="checkbox" class="pf-toggle accent-blue-500"
+          ${f.is_form_link ? "checked" : ""} />
+        <span>Form link</span>
+      </label>
 
-        <button type="button"
-          class="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
-          Delete
-        </button>
-      </div>
+      <button type="button"
+        class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
+        Delete
+      </button>
     `;
 
-    const labelInput = row.querySelectorAll('input')[0];
-    const keyInput   = row.querySelectorAll('input')[1];
-    const toggle      = row.querySelector('.form-link-toggle');
-    const delBtn      = row.querySelector('button');
+    const labelInput = row.querySelector('.pf-label');
+    const keyInput   = row.querySelector('.pf-key');
+    const toggle      = row.querySelector('.pf-toggle');
+    const delBtn      = row.querySelector('.pf-del');
 
     labelInput.addEventListener('input', (e) => {
       f.label = e.target.value;
     });
 
     keyInput.addEventListener('input', (e) => {
-      const oldKey = String(f.key || "").trim();
-      const newKey = e.target.value.replace(/\s+/g,'_');
-      f.key = newKey;
-      if (e.target.value !== newKey) e.target.value = newKey;
+      const oldKey = String(f.key || '').trim();
+      const newKey = e.target.value.replace(/\s+/g, '_');
 
-      // Si ya había un match guardado con oldKey, muévelo al nuevo key
-      if (oldKey && oldKey !== newKey && state.tellescopeFormMatches?.[oldKey]) {
-        state.tellescopeFormMatches[newKey] = state.tellescopeFormMatches[oldKey];
-        delete state.tellescopeFormMatches[oldKey];
-        saveTsFormMatches();
+      f.key = newKey;
+
+      // Si cambian el key y ya había match de form link, migra el match al nuevo key
+      if (oldKey && newKey && oldKey !== newKey) {
+        const cur = state.tellescopeFormMatches?.[oldKey];
+        if (cur) {
+          state.tellescopeFormMatches[newKey] = cur;
+          delete state.tellescopeFormMatches[oldKey];
+          saveTsFormMatches();
+        }
       }
     });
 
     toggle.addEventListener('change', (e) => {
       f.is_form_link = !!e.target.checked;
 
-      // Opcional: si apagaron form link, podrías borrar el match guardado
-      // const k = String(f.key || "").trim();
-      // if (!f.is_form_link && k && state.tellescopeFormMatches?.[k]) {
-      //   delete state.tellescopeFormMatches[k];
-      //   saveTsFormMatches();
-      // }
+      // si lo apagó, limpia el match guardado para ese key
+      const key = String(f.key || '').trim();
+      if (!f.is_form_link && key && state.tellescopeFormMatches?.[key]) {
+        delete state.tellescopeFormMatches[key];
+        saveTsFormMatches();
+      }
     });
 
     delBtn.addEventListener('click', () => {
+      const key = String(f.key || '').trim();
+
+      // borra field del programa
       program.fields = program.fields.filter(x => x !== f);
+
+      // borra match de forms si existía
+      if (key && state.tellescopeFormMatches?.[key]) {
+        delete state.tellescopeFormMatches[key];
+        saveTsFormMatches();
+      }
+
       renderFieldsEditor();
     });
 
     list.appendChild(row);
   });
 
+  // botón + Add Field
   const addBtn = document.getElementById('btn-add-field');
   if (addBtn) {
     addBtn.disabled = extras.length >= 10;
@@ -1582,24 +1597,19 @@ function setGenerateButtonMode(mode) {
   const brandVisible = {};
   const allInputs = Array.from(document.querySelectorAll('.brand-input'));
 
-  // Solo inputs visibles (los del programa actual)
   allInputs
     .filter(input => input.id && input.offsetParent !== null && !input.dataset.formLink)
     .forEach(input => {
       brandVisible[input.id] = input.value;
     });
 
-  // normaliza color si viene sin #
   if (brandVisible.brand_color) {
     brandVisible.brand_color = normalizeHexColor(brandVisible.brand_color);
   }
 
-  // guardamos en localStorage MERGEADO (para recordar valores aunque cambies programa)
   const prev = JSON.parse(localStorage.getItem('eb_brand_db') || "{}");
   const merged = { ...prev, ...brandVisible };
   localStorage.setItem('eb_brand_db', JSON.stringify(merged));
-
-  // state.brand lo dejamos con el merge para reemplazos
   state.brand = merged;
 }
 
