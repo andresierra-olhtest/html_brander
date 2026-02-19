@@ -376,7 +376,7 @@
     </div>
   </div>
 </div>
-
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script>
     // ------------- HELPERS -------------
     const $ = (id) => document.getElementById(id);
@@ -722,20 +722,33 @@ async function apiUpdateProgramFields(programId, fields) {
     // ------------- INIT -------------
 
     async function loadProgramsAndInitSelection() {
-  state.programs = await apiGetPrograms();
-
-  if (!state.programs.length) {
-    throw new Error("No programs returned from /api/programs");
+  // 1) intenta traer programas
+  try {
+    const programs = await apiGetPrograms();
+    if (Array.isArray(programs) && programs.length) {
+      state.programs = programs;
+    } else {
+      console.warn("apiGetPrograms returned empty array. Using existing fallback state.programs.");
+    }
+  } catch (e) {
+    console.warn("GET /api/programs failed. Using fallback state.programs.", e);
+    // deja el fallback que ya tienes en state.programs
   }
 
-  // si slug actual no existe, usa el primero
-  let selected = state.programs.find(p => p.slug === state.selectedProgramSlug);
-  if (!selected) selected = state.programs[0];
+  // 2) garantiza que haya al menos 1 programa
+  if (!Array.isArray(state.programs) || !state.programs.length) {
+    state.programs = [{ slug: "default", name: "Default Program", fields: [] }];
+  }
 
-  state.selectedProgramSlug = selected.slug;
-  state.selectedProgramId = selected.id;
+  // 3) selecciona programa válido
+  let selected =
+    state.programs.find(p => p.slug === state.selectedProgramSlug) ||
+    state.programs[0];
 
-  // cargar templates para el programa seleccionado
+  state.selectedProgramSlug = selected.slug || "default";
+  state.selectedProgramId = selected.id ?? null;
+
+  // 4) SIEMPRE carga templates (si falla API => defaultTemplates)
   await reloadTemplatesForCurrentProgram();
 }
 
@@ -774,7 +787,7 @@ updatePushButtonVisibility();
       // si panel abierto, refrescarlo
       const panel = document.getElementById('fields-editor-panel');
       if (panel && !panel.classList.contains('hidden')) {
-        renderFieldsEditor();
+        ();
       }
     };
 
@@ -1073,9 +1086,12 @@ function renderFieldsEditor() {
   list.innerHTML = '';
 
   // -------------------------
-  // CORE FIELDS (sin toggle)
+  // CORE (bloqueados)
   // -------------------------
   core.forEach((f) => {
+    // seguridad: core nunca puede ser form link
+    f.is_form_link = false;
+
     const row = document.createElement('div');
     row.className =
       "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_auto] gap-3 items-center " +
@@ -1083,26 +1099,20 @@ function renderFieldsEditor() {
 
     row.innerHTML = `
       <div class="text-slate-200 font-bold">${escapeHtml(f.label)}</div>
-
       <input disabled value="${escapeAttr(f.key)}"
         class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
-
       <div class="text-slate-500 text-[10px] font-extrabold uppercase tracking-widest justify-self-end">
         Core field
       </div>
     `;
 
-    // seguridad extra: core nunca debe ser form link
-    f.is_form_link = false;
-
     list.appendChild(row);
   });
 
   // -------------------------
-  // EXTRA FIELDS (con toggle)
+  // EXTRAS (editable + toggle)
   // -------------------------
   extras.forEach((f) => {
-    // normaliza por si viene undefined
     f.is_form_link = !!f.is_form_link;
 
     const row = document.createElement('div');
@@ -1111,19 +1121,16 @@ function renderFieldsEditor() {
       "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
     row.innerHTML = `
-      <input
+      <input value="${escapeAttr(f.label)}"
         class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
-        value="${escapeAttr(f.label)}"
         placeholder="Label (e.g. Portal URL)" />
 
-      <input
+      <input value="${escapeAttr(f.key)}"
         class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
-        value="${escapeAttr(f.key)}"
         placeholder="placeholder key (e.g. portal_url)" />
 
-      <label class="flex items-center gap-2 text-slate-200/80 text-xs font-bold select-none">
-        <input type="checkbox" class="form-link-toggle w-4 h-4 rounded"
-          ${f.is_form_link ? "checked" : ""} />
+      <label class="flex items-center gap-2 text-xs text-slate-300 font-bold select-none">
+        <input type="checkbox" class="pf-toggle form-link-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
         <span>Form link</span>
       </label>
 
@@ -1133,20 +1140,18 @@ function renderFieldsEditor() {
     `;
 
     const labelInput = row.querySelector('.pf-label');
-    const keyInput   = row.querySelector('.pf-key');
-    const toggle     = row.querySelector('.form-link-toggle');
-    const delBtn     = row.querySelector('.pf-del');
+    const keyInput = row.querySelector('.pf-key');
+    const toggle = row.querySelector('.pf-toggle');
+    const delBtn = row.querySelector('.pf-del');
 
     labelInput?.addEventListener('input', (e) => {
       f.label = e.target.value;
     });
 
     keyInput?.addEventListener('input', (e) => {
-      // normaliza para que sea key válida
       f.key = e.target.value.replace(/\s+/g, '_');
     });
 
-    // ✅ AQUÍ ES DONDE VA EL LISTENER DEL TOGGLE
     toggle?.addEventListener('change', (e) => {
       f.is_form_link = !!e.target.checked;
     });
@@ -1159,12 +1164,10 @@ function renderFieldsEditor() {
     list.appendChild(row);
   });
 
-  // deshabilita “Add field” si ya hay 10 extras
   const addBtn = document.getElementById('btn-add-field');
   if (addBtn) {
-    const disabled = extras.length >= 10;
-    addBtn.disabled = disabled;
-    addBtn.classList.toggle('opacity-50', disabled);
+    addBtn.disabled = extras.length >= 10;
+    addBtn.classList.toggle('opacity-50', extras.length >= 10);
   }
 }
 
@@ -1937,8 +1940,14 @@ document.getElementById('btn-add-template')?.addEventListener('click', () => {
 });
     // ------------- START -------------
 
-    init();
+    init().catch((e) => {
+  console.error("INIT FAILED:", e);
+  // fallback mínimo: no te deja UI en blanco si init revienta
+  state.templates = (state.templates && state.templates.length) ? state.templates : defaultTemplates();
+  try { renderProgramTabs(); } catch {}
+  try { updateProgramFieldsVisibility(); } catch {}
+  try { checkValidations(); } catch {}
+});
   </script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </body>
 </html>
