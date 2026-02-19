@@ -1065,73 +1065,162 @@ function renderFieldsEditor() {
   if (!program || !list) return;
 
   program.fields = Array.isArray(program.fields) ? program.fields : [];
-  program.fields.sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  program.fields.sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999));
 
   const core = program.fields.filter(f => f.is_core);
   const extras = program.fields.filter(f => !f.is_core);
 
   list.innerHTML = '';
 
+  // -------------------------
+  // CORE FIELDS (sin toggle)
+  // -------------------------
   core.forEach((f) => {
     const row = document.createElement('div');
-    row.className = "grid grid-cols-1 md:grid-cols-3 gap-3 items-center bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
-    row.innerHTML = `
-  <input value="${escapeAttr(f.label)}"
-    class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
-    placeholder="Label (e.g. Portal URL)" />
-  <input value="${escapeAttr(f.key)}"
-    class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
-    placeholder="placeholder key (e.g. portal_url)" />
-  <div class="flex items-center justify-between gap-3">
-    <label class="inline-flex items-center gap-2 text-xs text-slate-300 font-bold">
-      <input type="checkbox" class="form-link-toggle accent-blue-500" ${f.is_form_link ? "checked" : ""} />
-      <span>Form link</span>
-    </label>
-    <button class="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
-      Delete
-    </button>
-  </div>
-`;
-    list.appendChild(row);
-  });
+    row.className =
+      "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_auto] gap-3 items-center " +
+      "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
 
-  extras.forEach((f) => {
-    const row = document.createElement('div');
-    row.className = "grid grid-cols-1 md:grid-cols-3 gap-3 items-center bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
     row.innerHTML = `
-      <input value="${escapeAttr(f.label)}"
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
-        placeholder="Label (e.g. Portal URL)" />
-      <input value="${escapeAttr(f.key)}"
-        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
-        placeholder="placeholder key (e.g. portal_url)" />
-      <div class="flex items-center justify-between gap-3">
-        <span class="text-slate-400 text-xs">Extra field</span>
-        <button class="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
-          Delete
-        </button>
+      <div class="text-slate-200 font-bold">${escapeHtml(f.label)}</div>
+
+      <input disabled value="${escapeAttr(f.key)}"
+        class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono" />
+
+      <div class="text-slate-500 text-[10px] font-extrabold uppercase tracking-widest justify-self-end">
+        Core field
       </div>
     `;
 
-    const labelInput = row.querySelectorAll('input')[0];
-const keyInput = row.querySelectorAll('input')[1];
-const toggle = row.querySelector('.form-link-toggle');
-const delBtn = row.querySelector('button');
+    // seguridad extra: core nunca debe ser form link
+    f.is_form_link = false;
 
-    labelInput.addEventListener('input', (e) => { f.label = e.target.value; });
-    keyInput.addEventListener('input', (e) => { f.key = e.target.value.replace(/\s+/g,'_'); });
+    list.appendChild(row);
+  });
 
+  // -------------------------
+  // EXTRA FIELDS (con toggle)
+  // -------------------------
+  extras.forEach((f) => {
+    // normaliza por si viene undefined
+    f.is_form_link = !!f.is_form_link;
+
+    const row = document.createElement('div');
+    row.className =
+      "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_0.8fr_auto] gap-3 items-center " +
+      "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
+
+    row.innerHTML = `
+      <input
+        class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+        value="${escapeAttr(f.label)}"
+        placeholder="Label (e.g. Portal URL)" />
+
+      <input
+        class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+        value="${escapeAttr(f.key)}"
+        placeholder="placeholder key (e.g. portal_url)" />
+
+      <label class="flex items-center gap-2 text-slate-200/80 text-xs font-bold select-none">
+        <input type="checkbox" class="form-link-toggle w-4 h-4 rounded"
+          ${f.is_form_link ? "checked" : ""} />
+        <span>Form link</span>
+      </label>
+
+      <button class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
+        Delete
+      </button>
+    `;
+
+    const labelInput = row.querySelector('.pf-label');
+    const keyInput   = row.querySelector('.pf-key');
+    const toggle     = row.querySelector('.form-link-toggle');
+    const delBtn     = row.querySelector('.pf-del');
+
+    labelInput?.addEventListener('input', (e) => {
+      f.label = e.target.value;
+    });
+
+    keyInput?.addEventListener('input', (e) => {
+      // normaliza para que sea key válida
+      f.key = e.target.value.replace(/\s+/g, '_');
+    });
+
+    // ✅ AQUÍ ES DONDE VA EL LISTENER DEL TOGGLE
     toggle?.addEventListener('change', (e) => {
-  f.is_form_link = !!e.target.checked;
-});
-    
-    delBtn.addEventListener('click', () => {
+      f.is_form_link = !!e.target.checked;
+    });
+
+    delBtn?.addEventListener('click', () => {
       program.fields = program.fields.filter(x => x !== f);
       renderFieldsEditor();
     });
 
     list.appendChild(row);
   });
+
+  // deshabilita “Add field” si ya hay 10 extras
+  const addBtn = document.getElementById('btn-add-field');
+  if (addBtn) {
+    const disabled = extras.length >= 10;
+    addBtn.disabled = disabled;
+    addBtn.classList.toggle('opacity-50', disabled);
+  }
+}
+
+  extras.forEach((f) => {
+  const row = document.createElement('div');
+  row.className =
+    "grid grid-cols-1 md:grid-cols-[1.2fr_1fr_0.8fr_auto] gap-3 items-center " +
+    "bg-slate-900/30 border border-slate-700/60 rounded-2xl p-4";
+
+  row.innerHTML = `
+    <input
+      class="pf-label bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+      value="${escapeAttr(f.label)}"
+      placeholder="Label (e.g. Portal URL)" />
+
+    <input
+      class="pf-key bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono"
+      value="${escapeAttr(f.key)}"
+      placeholder="placeholder key (e.g. portal_url)" />
+
+    <label class="flex items-center gap-2 text-slate-200/80 text-xs font-bold select-none">
+      <input type="checkbox" class="form-link-toggle w-4 h-4 rounded"
+        ${f.is_form_link ? "checked" : ""} />
+      <span>Form link</span>
+    </label>
+
+    <button class="pf-del px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-bold">
+      Delete
+    </button>
+  `;
+
+  const labelInput = row.querySelector('.pf-label');
+  const keyInput   = row.querySelector('.pf-key');
+  const toggle     = row.querySelector('.form-link-toggle');
+  const delBtn     = row.querySelector('.pf-del');
+
+  labelInput?.addEventListener('input', (e) => {
+    f.label = e.target.value;
+  });
+
+  keyInput?.addEventListener('input', (e) => {
+    f.key = e.target.value.replace(/\s+/g, '_');
+  });
+
+  // ✅ AQUÍ VA EL LISTENER DEL TOGGLE (exactamente aquí)
+  toggle?.addEventListener('change', (e) => {
+    f.is_form_link = !!e.target.checked;
+  });
+
+  delBtn?.addEventListener('click', () => {
+    program.fields = program.fields.filter(x => x !== f);
+    renderFieldsEditor();
+  });
+
+  list.appendChild(row);
+});
 
   const addBtn = document.getElementById('btn-add-field');
   if (addBtn) {
