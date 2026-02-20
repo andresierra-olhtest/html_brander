@@ -34,13 +34,15 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const programSlug = url.searchParams.get("program_slug") || "default";
-
     const programId = await getProgramIdBySlug(programSlug);
 
     const { data, error } = await supabase
       .from("email_templates")
-      .select("id,name,html,program_id")
+      .select("id,name,html,program_id,sort_order")
       .eq("program_id", programId)
+      // orden principal: sort_order
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      // fallback estable: id
       .order("id", { ascending: true });
 
     if (error) {
@@ -75,16 +77,25 @@ export async function POST(req: Request) {
 
     const programId = await getProgramIdBySlug(programSlug);
 
-    // Asegurar program_id en cada fila
-    const payload = templates.map((t: any) => ({
-      id: t.id,
-      name: t.name,
-      html: t.html,
-      program_id: programId
-    }));
+    // IMPORTANT: persistimos el orden del array como sort_order
+    const payload = templates.map((t: any, idx: number) => {
+      const id = Number(t?.id);
+      if (!Number.isFinite(id)) {
+        throw new Error(`template.id must be a number (got: ${t?.id})`);
+      }
+
+      return {
+        id,
+        name: String(t?.name || ""),
+        html: String(t?.html || ""),
+        program_id: programId,
+        sort_order: idx + 1,
+      };
+    });
 
     const { error } = await supabase
       .from("email_templates")
+      // mantenemos tu comportamiento actual
       .upsert(payload, { onConflict: "id" });
 
     if (error) {
