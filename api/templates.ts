@@ -26,8 +26,17 @@ async function getProgramIdBySlug(slug: string) {
   if (error) throw new Error(error.message);
   if (!data) throw new Error(`Program not found for slug: ${programSlug}`);
 
-  return data.id as number;
+  return Number(data.id);
 }
+
+type DbTemplateRow = {
+  id: number; // DB primary key
+  program_id: number;
+  local_template_id: number;
+  name: string | null;
+  html: string | null;
+  sort_order: number | null;
+};
 
 // GET /api/templates?program_slug=default
 export async function GET(req: Request) {
@@ -38,18 +47,33 @@ export async function GET(req: Request) {
 
     const { data, error } = await supabase
       .from("email_templates")
-      .select("id,name,html,program_id,sort_order")
+      .select("id,program_id,local_template_id,name,html,sort_order")
       .eq("program_id", programId)
       // orden principal: sort_order
       .order("sort_order", { ascending: true, nullsFirst: false })
-      // fallback estable: id
+      // fallback estable
+      .order("local_template_id", { ascending: true })
       .order("id", { ascending: true });
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ templates: data ?? [] }, { status: 200 });
+    const rows = (data ?? []) as DbTemplateRow[];
+
+    // IMPORTANT:
+    // Devolvemos `id` como `local_template_id` para que el frontend siga igual (sin cambios).
+    const templates = rows.map((r) => ({
+      id: r.local_template_id ?? r.id,
+      name: r.name ?? "",
+      html: r.html ?? "",
+      program_id: r.program_id,
+      sort_order: r.sort_order ?? null,
+      // Si alguna vez necesitas debug:
+      // db_id: r.id,
+    }));
+
+    return Response.json({ templates }, { status: 200 });
   } catch (err: any) {
     return Response.json(
       { error: err?.message || "Unknown error" },
@@ -77,26 +101,38 @@ export async function POST(req: Request) {
 
     const programId = await getProgramIdBySlug(programSlug);
 
-    // IMPORTANT: persistimos el orden del array como sort_order
-    const payload = templates.map((t: any, idx: number) => {
-      const id = Number(t?.id);
-      if (!Number.isFinite(id)) {
-        throw new Error(`template.id must be a number (got: ${t?.id})`);
+    // Validación: ids duplicados dentro del mismo payload
+    const seen = new Set<number>();
+    for (const t of templates) {
+      const localId = Number(t?.id);
+      if (!Number.isFinite(localId)) {
+        return Response.json(
+          { error: `template.id must be a number (got: ${t?.id})` },
+          { status: 400 }
+        );
       }
+      if (seen.has(localId)) {
+        return Response.json(
+          { error: `duplicate template id found: ${localId}` },
+          { status: 400 }
+        );
+      }
+      seen.add(localId);
+    }
 
-      return {
-        id,
-        name: String(t?.name || ""),
-        html: String(t?.html || ""),
-        program_id: programId,
-        sort_order: idx + 1,
-      };
-    });
+    // Guardamos el orden del array como sort_order.
+    // IMPORTANT: usamos local_template_id para que cada programa tenga su propio "id lógico".
+    const payload = templates.map((t: any, idx: number) => ({
+      program_id: programId,
+      local_template_id: Number(t.id),
+      name: String(t?.name || ""),
+      html: String(t?.html || ""),
+      sort_order: idx + 1,
+    }));
 
     const { error } = await supabase
       .from("email_templates")
-      // mantenemos tu comportamiento actual
-      .upsert(payload, { onConflict: "id" });
+      .upsert(payload, { onConflict: "program_id,local_template_id" });
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
